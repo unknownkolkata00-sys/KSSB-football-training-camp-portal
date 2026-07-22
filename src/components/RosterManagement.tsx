@@ -173,7 +173,7 @@ export default function RosterManagement({
       {/* Control Actions Header */}
       <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-4 md:items-center justify-between" id="roster-actions-header">
         <div className="flex items-center gap-4">
-          <img src={logo} alt="KSSB FC Logo" className="w-14 h-14 rounded-xl border-2 border-amber-500 object-contain bg-white p-0.5 shadow-sm shrink-0" />
+          <img src={logo || '/logo.jpg'} onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }} alt="KSSB FC Logo" className="w-14 h-14 rounded-xl border-2 border-amber-500 object-contain bg-white p-0.5 shadow-sm shrink-0" />
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono font-bold text-emerald-700 uppercase tracking-widest">KSSB FC Registration Hub</span>
@@ -219,7 +219,7 @@ export default function RosterManagement({
             </button>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pb-4 border-b border-gray-100 pr-8">
-              <img src={logo} alt="KSSB FC Logo" className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl border border-emerald-600 object-contain bg-white p-0.5 shrink-0" />
+              <img src={logo || '/logo.jpg'} onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }} alt="KSSB FC Logo" className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl border border-emerald-600 object-contain bg-white p-0.5 shrink-0" />
               <div className="min-w-0 flex-1">
                 <span className="text-[10px] font-mono font-bold text-emerald-700 uppercase tracking-widest block">New Player Enrollment</span>
                 <h3 className="text-lg sm:text-xl font-black text-gray-900 leading-tight">Student Profile Registration</h3>
@@ -387,7 +387,7 @@ export default function RosterManagement({
             </button>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pb-4 border-b border-gray-100 pr-8">
-              <img src={logo} alt="KSSB FC Logo" className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl border border-emerald-600 object-contain bg-white p-0.5 shrink-0" />
+              <img src={logo || '/logo.jpg'} onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }} alt="KSSB FC Logo" className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl border border-emerald-600 object-contain bg-white p-0.5 shrink-0" />
               <div className="min-w-0 flex-1">
                 <span className="text-[10px] font-mono font-bold text-amber-600 uppercase tracking-widest block">Admin Edit Permissions Only</span>
                 <h3 className="text-lg sm:text-xl font-black text-gray-900 leading-tight">Edit Student Profile ({editingStudent.registrationNumber})</h3>
@@ -668,7 +668,7 @@ export default function RosterManagement({
               <div key={student.id} className="p-4 bg-gray-50/70 border border-gray-200 rounded-2xl space-y-3">
                 <div className="flex justify-between items-start gap-2">
                   <div className="flex items-center gap-2.5">
-                    <img src={logo} alt="KSSB FC Logo" className="w-10 h-10 rounded-xl border border-emerald-600 object-contain bg-white p-0.5 shrink-0" />
+                    <img src={logo || '/logo.jpg'} onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }} alt="KSSB FC Logo" className="w-10 h-10 rounded-xl border border-emerald-600 object-contain bg-white p-0.5 shrink-0" />
                     <div>
                       <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md inline-block mb-0.5">
                         {student.registrationNumber || 'KSSBFC0001/26-27'}
@@ -753,7 +753,7 @@ export default function RosterManagement({
                   <tr key={student.id} className="hover:bg-emerald-50/20 transition-colors">
                     <td className="p-4">
                       <div className="flex items-center gap-3">
-                        <img src={logo} alt="KSSB FC Logo" className="w-9 h-9 rounded-lg border border-emerald-600 object-contain bg-white p-0.5 shrink-0" />
+                        <img src={logo || '/logo.jpg'} onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }} alt="KSSB FC Logo" className="w-9 h-9 rounded-lg border border-emerald-600 object-contain bg-white p-0.5 shrink-0" />
                         <div>
                           <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md inline-block mb-0.5">
                             {student.registrationNumber || 'KSSBFC0001/26-27'}

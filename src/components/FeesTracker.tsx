@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Student, FeeStatus } from '../types';
-import { Check, CreditCard, IndianRupee, Search, AlertCircle, FileText, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
+import { Check, CreditCard, IndianRupee, Search, AlertCircle, FileText, CheckCircle2, Clock, AlertTriangle, Download } from 'lucide-react';
+import { downloadFeesReportCSV } from '../utils/reports';
 
 interface FeesTrackerProps {
   students: Student[];
@@ -406,6 +407,15 @@ export default function FeesTracker({
               </button>
             ))}
           </div>
+
+          <button
+            onClick={() => downloadFeesReportCSV(students, fees, selectedMonth)}
+            className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+            title="Download CSV Fees Report for selected month"
+            id="fees-tracker-download-btn"
+          >
+            <Download size={14} /> Download Report
+          </button>
         </div>
       </div>
 

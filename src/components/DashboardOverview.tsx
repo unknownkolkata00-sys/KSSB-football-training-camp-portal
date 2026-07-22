@@ -1,8 +1,9 @@
 import React from 'react';
 import { Student, PerformanceMetric, FeeStatus } from '../types';
-import { Users, CreditCard, Activity, CheckCircle, ArrowRight } from 'lucide-react';
+import { Users, CreditCard, Activity, CheckCircle, ArrowRight, Download, FileText, CalendarCheck, IndianRupee } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend } from 'recharts';
 import kssbFcLogo from '../assets/images/kssb_fc_logo_1784404534667.jpg';
+import { downloadAttendanceReportCSV, downloadFeesReportCSV } from '../utils/reports';
 
 interface DashboardOverviewProps {
   students: Student[];
@@ -74,7 +75,8 @@ export default function DashboardOverview({
           {/* Logo container right in the banner */}
           <div className="shrink-0 flex items-center justify-center p-1.5 bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 rounded-3xl shadow-lg ring-4 ring-yellow-400/20 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 mx-auto md:mx-0">
             <img 
-              src={kssbFcLogo} 
+              src={kssbFcLogo || '/logo.jpg'} 
+              onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }}
               alt="KSSB FC Logo" 
               className="w-full h-full object-contain rounded-2xl bg-white p-1"
               referrerPolicy="no-referrer"
@@ -120,6 +122,64 @@ export default function DashboardOverview({
           </div>
           <div className="p-3.5 bg-amber-50 text-amber-600 rounded-xl">
             <CreditCard size={28} />
+          </div>
+        </div>
+      </div>
+
+      {/* Admin Quick Report Downloads Bar */}
+      <div className="p-5 bg-slate-900 border border-slate-800 rounded-2xl text-white space-y-4 shadow-md" id="admin-reports-download-card">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-widest">Admin Export Portal</span>
+              <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded text-[10px] font-bold">CSV Reports Ready</span>
+            </div>
+            <h2 className="text-lg font-bold text-slate-100 font-sans">Official Club Reports & Ledger Downloads</h2>
+          </div>
+          <p className="text-xs text-slate-400">Instantly generate spreadsheet-compatible CSV reports for administrative record-keeping.</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+          {/* Attendance Report Download Button */}
+          <div className="p-4 bg-slate-950/80 rounded-xl border border-slate-800 flex flex-col justify-between gap-3 hover:border-emerald-500/50 transition-all">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                  <CalendarCheck size={16} /> Attendance Report
+                </span>
+                <p className="text-xs text-slate-300">
+                  Includes full session history, athlete attendance rates (%), present/absent/excused counts, and coach notes.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => downloadAttendanceReportCSV(students, metrics)}
+              className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm border border-emerald-400/30"
+              id="download-attendance-report-btn"
+            >
+              <Download size={15} /> Download Attendance Report (CSV)
+            </button>
+          </div>
+
+          {/* Fees Ledger Report Download Button */}
+          <div className="p-4 bg-slate-950/80 rounded-xl border border-slate-800 flex flex-col justify-between gap-3 hover:border-amber-500/50 transition-all">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                  <IndianRupee size={16} /> Fees & Tuition Ledger Report
+                </span>
+                <p className="text-xs text-slate-300">
+                  Includes athlete fee statuses (Paid, Pending, Overdue), amounts, settlement dates, payment methods, and parent contacts.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => downloadFeesReportCSV(students, fees, 'July 2026')}
+              className="w-full py-2.5 px-4 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm border border-amber-400/30"
+              id="download-fees-report-btn"
+            >
+              <Download size={15} /> Download Fees Ledger Report (CSV)
+            </button>
           </div>
         </div>
       </div>

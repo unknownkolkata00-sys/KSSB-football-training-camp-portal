@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Student, PerformanceMetric } from '../types';
-import { Sparkles, Activity, Clock, Award, ShieldAlert, AlignLeft, BarChart2 } from 'lucide-react';
+import { Sparkles, Activity, Clock, Award, ShieldAlert, AlignLeft, BarChart2, Download } from 'lucide-react';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { downloadAttendanceReportCSV } from '../utils/reports';
 
 interface PlayerPerformanceViewProps {
   students: Student[];
@@ -92,7 +93,7 @@ export default function PlayerPerformanceView({
             {role === 'student' ? 'Your active seasonal performance benchmarks, metrics history, and coach feedback.' : 'Track benchmarks, inspect radar charts, and review coach feedback sheets.'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {role === 'student' ? (
             <div className="px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -101,16 +102,27 @@ export default function PlayerPerformanceView({
             </div>
           ) : (
             <>
-              <label className="text-xs font-mono font-bold text-gray-700 uppercase">Select Athlete Profile:</label>
-              <select
-                value={selectedStudentId}
-                onChange={(e) => setSelectedStudentId(e.target.value)}
-                className="px-3.5 py-2 border border-gray-200 rounded-lg text-sm bg-white font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-mono font-bold text-gray-700 uppercase">Select Athlete Profile:</label>
+                <select
+                  value={selectedStudentId}
+                  onChange={(e) => setSelectedStudentId(e.target.value)}
+                  className="px-3.5 py-2 border border-gray-200 rounded-lg text-sm bg-white font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+                >
+                  {students.map(s => (
+                    <option key={s.id} value={s.id}>{s.name} ({s.position})</option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                onClick={() => downloadAttendanceReportCSV(students, metrics)}
+                className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ml-1"
+                title="Download Camp Attendance & Metrics CSV Report"
+                id="download-attendance-report-header-btn"
               >
-                {students.map(s => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.position})</option>
-                ))}
-              </select>
+                <Download size={14} /> Attendance Report
+              </button>
             </>
           )}
         </div>

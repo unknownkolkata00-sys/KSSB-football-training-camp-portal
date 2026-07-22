@@ -13,6 +13,7 @@ import CoachPortal from './components/CoachPortal';
 import StudentPortal from './components/StudentPortal';
 import Login from './components/Login';
 import AndroidAppModal from './components/AndroidAppModal';
+import { downloadAttendanceReportCSV, downloadFeesReportCSV } from './utils/reports';
 import { AnimatePresence, motion } from 'motion/react';
 import kssbFcLogo from './assets/images/kssb_fc_logo_1784404534667.jpg';
 import { 
@@ -33,7 +34,9 @@ import {
   Key,
   Check,
   LogOut,
-  Smartphone
+  Smartphone,
+  ArrowLeft,
+  Home
 } from 'lucide-react';
 
 export default function App() {
@@ -208,7 +211,8 @@ export default function App() {
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 p-0.5 shadow-md shadow-emerald-950/40 shrink-0">
               <img 
-                src={kssbFcLogo} 
+                src={kssbFcLogo || '/logo.jpg'} 
+                onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }}
                 alt="KSSB FC Logo" 
                 className="w-full h-full object-contain rounded-[10px] bg-white p-0.5"
                 referrerPolicy="no-referrer"
@@ -304,15 +308,37 @@ export default function App() {
           </button>
 
           {role === 'admin' && (
-            <button
-              onClick={triggerMasterExport}
-              className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-700"
-              title="Export Master Database Packages"
-              id="master-export-btn"
-            >
-              <FileDown size={14} />
-              Export Camp Master Report
-            </button>
+            <div className="space-y-1.5 pt-1">
+              <button
+                onClick={() => downloadAttendanceReportCSV(students, metrics)}
+                className="w-full py-2 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-emerald-800/60"
+                title="Download Attendance & Metrics CSV Report"
+                id="sidebar-attendance-export-btn"
+              >
+                <FileDown size={13} className="text-emerald-400" />
+                Attendance Report (CSV)
+              </button>
+
+              <button
+                onClick={() => downloadFeesReportCSV(students, fees, 'July 2026')}
+                className="w-full py-2 bg-amber-950/80 hover:bg-amber-900 text-amber-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-amber-800/60"
+                title="Download Fees & Ledger CSV Report"
+                id="sidebar-fees-export-btn"
+              >
+                <FileDown size={13} className="text-amber-400" />
+                Fees Ledger Report (CSV)
+              </button>
+
+              <button
+                onClick={triggerMasterExport}
+                className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-700"
+                title="Export Master Database Packages (JSON)"
+                id="master-export-btn"
+              >
+                <FileDown size={13} />
+                Master JSON Package
+              </button>
+            </div>
           )}
         </div>
       </aside>
@@ -325,7 +351,8 @@ export default function App() {
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 p-0.5 shrink-0">
             <img 
-              src={kssbFcLogo} 
+              src={kssbFcLogo || '/logo.jpg'} 
+              onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }}
               alt="KSSB FC" 
               className="w-full h-full object-contain rounded-[8px] bg-white p-0.5"
               referrerPolicy="no-referrer"
@@ -400,6 +427,25 @@ export default function App() {
             {/* 1. ADMIN LOGIN VIEW */}
             {role === 'admin' && (
               <>
+                {/* Back to Dashboard Navigation Header Bar */}
+                {activeTab !== 'dashboard' && (
+                  <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 p-3.5 px-5 rounded-2xl border border-slate-800 text-slate-100 shadow-md" id="admin-back-to-dashboard-bar">
+                    <button
+                      onClick={() => selectTab('dashboard')}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-sm border border-emerald-400/30 w-fit"
+                      id="back-to-dashboard-btn"
+                    >
+                      <ArrowLeft size={16} /> Back to Overview Dashboard
+                    </button>
+                    <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+                      <span>Active Admin Module:</span>
+                      <span className="px-2.5 py-1 bg-slate-800 text-yellow-400 font-bold rounded-lg text-[11px] uppercase tracking-wider border border-slate-700">
+                        {activeTab.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {activeTab === 'dashboard' && (
                   <DashboardOverview 
                     students={students}

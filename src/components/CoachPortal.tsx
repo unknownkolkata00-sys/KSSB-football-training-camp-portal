@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Student, PerformanceMetric, FeeStatus } from '../types';
-import { UserCheck, Activity, CreditCard, Lock, CheckCircle2, Clock, Check, Phone, Award } from 'lucide-react';
+import { UserCheck, Activity, CreditCard, Lock, CheckCircle2, Clock, Check, Phone, Award, ArrowLeft } from 'lucide-react';
 
 interface CoachPortalProps {
   students: Student[];
@@ -130,6 +130,25 @@ export default function CoachPortal({
   return (
     <div className="space-y-6" id="coach-portal-root">
       
+      {/* Back to Dashboard Navigation Header Bar */}
+      {activeSubTab !== 'attendance' && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 p-3.5 px-5 rounded-2xl border border-slate-800 text-slate-100 shadow-md" id="coach-back-to-dashboard-bar">
+          <button
+            onClick={() => setActiveSubTab('attendance')}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-sm border border-emerald-400/30 w-fit"
+            id="coach-back-to-dashboard-btn"
+          >
+            <ArrowLeft size={16} /> Back to Attendance & Main Dashboard
+          </button>
+          <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+            <span>Active Coach View:</span>
+            <span className="px-2.5 py-1 bg-slate-800 text-yellow-400 font-bold rounded-lg text-[11px] uppercase tracking-wider border border-slate-700">
+              {activeSubTab.replace('_', ' ')}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Coach Welcome & Sub-navigation Header */}
       <div className="bg-emerald-950 border border-emerald-800 text-white p-4 sm:p-6 rounded-2xl shadow-md space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

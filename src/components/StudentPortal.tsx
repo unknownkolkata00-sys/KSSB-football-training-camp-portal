@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Student, PerformanceMetric, FeeStatus, Tournament } from '../types';
-import { User, Calendar, Award, CreditCard, Trophy, CheckCircle2, AlertCircle, Clock, Star, Users, Phone, Mail, Activity, ArrowUpRight, Zap, Shield, Check, X } from 'lucide-react';
+import { User, Calendar, Award, CreditCard, Trophy, CheckCircle2, AlertCircle, Clock, Star, Users, Phone, Mail, Activity, ArrowUpRight, Zap, Shield, Check, X, ArrowLeft } from 'lucide-react';
 
 interface StudentPortalProps {
   students: Student[];

@@ -69,7 +69,8 @@ export default function Login({ students, onLoginSuccess }: LoginProps) {
         <div className="bg-emerald-950 p-6 text-center text-white relative border-b border-emerald-800">
           <div className="flex justify-center mb-3">
             <img 
-              src={logo} 
+              src={logo || '/logo.jpg'} 
+              onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }}
               alt="KSSB FC Logo" 
               className="w-24 h-24 rounded-2xl border-2 border-amber-400 shadow-lg object-contain bg-white p-1" 
             />
