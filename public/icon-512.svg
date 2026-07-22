@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="96" fill="#064e3b" />
+  <circle cx="256" cy="256" r="200" fill="#022c22" stroke="#eab308" stroke-width="10" />
+  <!-- Football / Soccer ball icon -->
+  <circle cx="256" cy="256" r="130" fill="#ffffff" stroke="#000000" stroke-width="5" />
+  <polygon points="256,178 298,210 282,256 230,256 214,210" fill="#15803d" />
+  <polygon points="256,178 214,210 166,194 176,146 224,136" fill="#111827" />
+  <polygon points="256,178 298,210 346,194 336,146 288,136" fill="#111827" />
+  <polygon points="282,256 298,210 346,194 358,236 320,274" fill="#111827" />
+  <polygon points="230,256 214,210 166,194 154,236 192,274" fill="#111827" />
+  <polygon points="230,256 282,256 292,304 256,330 220,304" fill="#111827" />
+  <!-- KSSB Text -->
+  <text x="256" y="440" font-family="sans-serif" font-weight="900" font-size="52" fill="#eab308" text-anchor="middle">KSSB FC</text>
+</svg>

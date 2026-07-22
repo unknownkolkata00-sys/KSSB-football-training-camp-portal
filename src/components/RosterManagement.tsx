@@ -1,0 +1,838 @@
+import React, { useState } from 'react';
+import { Student, PerformanceMetric } from '../types';
+import logo from '../assets/images/kssb_fc_logo_1784404534667.jpg';
+import { UserPlus, FileSpreadsheet, Search, Check, AlertCircle, Sparkles, X, Edit3, Phone, MapPin, User, ShieldCheck } from 'lucide-react';
+
+interface RosterManagementProps {
+  students: Student[];
+  metrics: PerformanceMetric[];
+  userRole?: 'admin' | 'coach' | 'student';
+  onAddStudent: (student: Omit<Student, 'id' | 'registrationDate'>) => void;
+  onUpdateStudent?: (student: Student) => void;
+  onAddMetric: (metric: Omit<PerformanceMetric, 'id'>) => void;
+}
+
+export default function RosterManagement({
+  students,
+  metrics,
+  userRole = 'admin',
+  onAddStudent,
+  onUpdateStudent,
+  onAddMetric
+}: RosterManagementProps) {
+  const [showRegForm, setShowRegForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [showMetricForm, setShowMetricForm] = useState(false);
+  
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+
+  // Registration Form State
+  const [regName, setRegName] = useState('');
+  const [regFatherName, setRegFatherName] = useState('');
+  const [regMotherName, setRegMotherName] = useState('');
+  const [regAddress, setRegAddress] = useState('');
+  const [regMobileNo, setRegMobileNo] = useState('');
+  const [regGuardianName, setRegGuardianName] = useState('');
+  const [regGuardianMobileNo, setRegGuardianMobileNo] = useState('');
+  const [regPosition, setRegPosition] = useState<'Goalkeeper' | 'Defence' | 'Midfield' | 'Forward' | 'Winger'>('Forward');
+  const [regAge, setRegAge] = useState(14);
+  const [regParentEmail, setRegParentEmail] = useState('');
+
+  // Daily Metric Form State
+  const [metricDate, setMetricDate] = useState(new Date().toISOString().split('T')[0]);
+  const [metricSpeed, setMetricSpeed] = useState(5.0);
+  const [metricAgility, setMetricAgility] = useState(5.0);
+  const [metricStamina, setMetricStamina] = useState(7);
+  const [metricPassing, setMetricPassing] = useState(7);
+  const [metricShooting, setMetricShooting] = useState(7);
+  const [metricDefense, setMetricDefense] = useState(7);
+  const [metricAttendance, setMetricAttendance] = useState<'Present' | 'Absent' | 'Excused'>('Present');
+  const [metricNotes, setMetricNotes] = useState('');
+
+  // Search/Filters State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedPosFilter, setSelectedPosFilter] = useState('All');
+
+  // Notification Banner State
+  const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Next registration number preview
+  const nextRegIndex = students.length + 1;
+  const nextRegFormatted = `KSSBFC${String(nextRegIndex).padStart(4, '0')}/26-27`;
+
+  const handleRegister = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!regName || !regFatherName || !regMobileNo || !regAddress) {
+      setAlert({ type: 'error', message: 'Student Name, Father Name, Address and WhatsApp Mobile No are required!' });
+      return;
+    }
+
+    const regNum = `KSSBFC${String(students.length + 1).padStart(4, '0')}/26-27`;
+
+    onAddStudent({
+      registrationNumber: regNum,
+      name: regName,
+      fatherName: regFatherName,
+      motherName: regMotherName,
+      address: regAddress,
+      mobileNo: regMobileNo,
+      guardianName: regGuardianName || regFatherName,
+      guardianMobileNo: regGuardianMobileNo || regMobileNo,
+      position: regPosition,
+      age: Number(regAge),
+      parentName: regFatherName || regGuardianName,
+      parentEmail: regParentEmail || `${regName.toLowerCase().replace(/\s+/g, '.')}@kssbfc.org`,
+      parentPhone: regMobileNo,
+      status: 'Active'
+    });
+
+    setAlert({ 
+      type: 'success', 
+      message: `Successfully created Student Profile for ${regName} with Registration Number: ${regNum}! Admission Fee (₹350) and Tuition Fee (₹150) generated.` 
+    });
+
+    // Clear fields
+    setRegName('');
+    setRegFatherName('');
+    setRegMotherName('');
+    setRegAddress('');
+    setRegMobileNo('');
+    setRegGuardianName('');
+    setRegGuardianMobileNo('');
+    setRegAge(14);
+    setRegParentEmail('');
+    setShowRegForm(false);
+
+    setTimeout(() => setAlert(null), 8000);
+  };
+
+  const handleSaveEditProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent || !onUpdateStudent) return;
+
+    onUpdateStudent(editingStudent);
+    setAlert({ type: 'success', message: `Profile updated for ${editingStudent.name} (${editingStudent.registrationNumber})` });
+    setShowEditForm(false);
+    setEditingStudent(null);
+    setTimeout(() => setAlert(null), 5000);
+  };
+
+  const handleLogMetric = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStudent) return;
+
+    onAddMetric({
+      studentId: selectedStudent.id,
+      date: metricDate,
+      markedAt: Date.now(),
+      speed: Number(metricSpeed),
+      agility: Number(metricAgility),
+      stamina: Number(metricStamina),
+      passing: Number(metricPassing),
+      shooting: Number(metricShooting),
+      defense: Number(metricDefense),
+      attendance: metricAttendance,
+      notes: metricNotes
+    });
+
+    setAlert({ type: 'success', message: `Successfully logged training performance for ${selectedStudent.name} on ${metricDate}.` });
+    
+    setMetricNotes('');
+    setShowMetricForm(false);
+    setTimeout(() => setAlert(null), 5000);
+  };
+
+  // Filter students
+  const filteredStudents = students.filter(student => {
+    const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (student.registrationNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (student.fatherName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (student.mobileNo || '').includes(searchTerm);
+    const matchesPosition = selectedPosFilter === 'All' || student.position === selectedPosFilter;
+    return matchesSearch && matchesPosition;
+  });
+
+  return (
+    <div className="space-y-6" id="roster-management-root">
+      
+      {/* Alert Notification Banner */}
+      {alert && (
+        <div 
+          className={`p-4 rounded-xl flex items-start gap-3 border shadow-sm ${
+            alert.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
+          }`}
+          id="roster-action-alert"
+        >
+          {alert.type === 'success' ? <Check className="shrink-0 text-emerald-600 mt-0.5" /> : <AlertCircle className="shrink-0 text-red-600 mt-0.5" />}
+          <div className="text-sm font-medium">{alert.message}</div>
+          <button onClick={() => setAlert(null)} className="ml-auto text-gray-400 hover:text-gray-600 text-xs font-bold cursor-pointer">Dismiss</button>
+        </div>
+      )}
+
+      {/* Control Actions Header */}
+      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-4 md:items-center justify-between" id="roster-actions-header">
+        <div className="flex items-center gap-4">
+          <img src={logo} alt="KSSB FC Logo" className="w-14 h-14 rounded-full border-2 border-emerald-700 object-cover shadow-sm shrink-0" />
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono font-bold text-emerald-700 uppercase tracking-widest">KSSB FC Registration Hub</span>
+              {userRole === 'admin' && (
+                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-md flex items-center gap-1">
+                  <ShieldCheck size={12} /> Admin Access
+                </span>
+              )}
+            </div>
+            <h2 className="text-2xl font-black text-gray-900 font-sans">Student Athlete Roster</h2>
+            <p className="text-xs text-gray-500">
+              {userRole === 'admin' 
+                ? 'Register new students, auto-generate registration numbers, and edit student profiles.' 
+                : 'View student profile records and evaluation history.'}
+            </p>
+          </div>
+        </div>
+
+        {userRole === 'admin' && (
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setShowRegForm(true)}
+              className="px-5 py-2.5 bg-emerald-700 text-white rounded-xl text-xs font-bold hover:bg-emerald-800 shadow-md flex items-center gap-2 transition-all cursor-pointer"
+              id="register-player-btn"
+            >
+              <UserPlus size={18} />
+              + New Student Registration
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Register Student Modal Backdrop */}
+      {showRegForm && userRole === 'admin' && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto transition-all" id="register-student-modal">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-4 sm:p-6 space-y-5 shadow-2xl relative my-6 border border-emerald-100">
+            <button 
+              type="button"
+              onClick={() => setShowRegForm(false)}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 cursor-pointer z-10"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pb-4 border-b border-gray-100 pr-8">
+              <img src={logo} alt="KSSB FC Logo" className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border border-emerald-600 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] font-mono font-bold text-emerald-700 uppercase tracking-widest block">New Player Enrollment</span>
+                <h3 className="text-lg sm:text-xl font-black text-gray-900 leading-tight">Student Profile Registration</h3>
+                <div className="text-xs text-emerald-800 font-mono font-bold mt-1 flex flex-wrap items-center gap-1.5">
+                  <span>Auto Reg No:</span>
+                  <span className="bg-emerald-100 px-2 py-0.5 rounded text-emerald-950 font-bold break-all">{nextRegFormatted}</span>
+                </div>
+              </div>
+            </div>
+            
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+                
+                {/* Student Name */}
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Student Name *</label>
+                  <input 
+                    type="text" 
+                    value={regName}
+                    onChange={(e) => setRegName(e.target.value)}
+                    placeholder="e.g. Rahul Sharma"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+                    required
+                  />
+                </div>
+
+                {/* Preferable Playing Position */}
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Preferable Position *</label>
+                  <select 
+                    value={regPosition}
+                    onChange={(e) => setRegPosition(e.target.value as any)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-emerald-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+                  >
+                    <option value="Goalkeeper">Goalkeeper</option>
+                    <option value="Defence">Defence</option>
+                    <option value="Midfield">Midfield</option>
+                    <option value="Forward">Forward</option>
+                    <option value="Winger">Winger</option>
+                  </select>
+                </div>
+
+                {/* Father Name */}
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Father Name *</label>
+                  <input 
+                    type="text" 
+                    value={regFatherName}
+                    onChange={(e) => setRegFatherName(e.target.value)}
+                    placeholder="e.g. Suresh Sharma"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+                    required
+                  />
+                </div>
+
+                {/* Mother Name */}
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Mother Name</label>
+                  <input 
+                    type="text" 
+                    value={regMotherName}
+                    onChange={(e) => setRegMotherName(e.target.value)}
+                    placeholder="e.g. Sunita Sharma"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+                  />
+                </div>
+
+                {/* Mobile No with WhatsApp */}
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">WhatsApp Mobile No *</label>
+                  <input 
+                    type="tel" 
+                    value={regMobileNo}
+                    onChange={(e) => setRegMobileNo(e.target.value)}
+                    placeholder="e.g. 9876543210"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+                    required
+                  />
+                </div>
+
+                {/* Age */}
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Age *</label>
+                  <input 
+                    type="number" 
+                    value={regAge}
+                    onChange={(e) => setRegAge(Number(e.target.value))}
+                    min={5}
+                    max={25}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+                    required
+                  />
+                </div>
+
+                {/* Guardian Name */}
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Guardian Name</label>
+                  <input 
+                    type="text" 
+                    value={regGuardianName}
+                    onChange={(e) => setRegGuardianName(e.target.value)}
+                    placeholder="e.g. Ramesh Sharma"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+                  />
+                </div>
+
+                {/* Guardian Mobile No */}
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Guardian Mobile No</label>
+                  <input 
+                    type="tel" 
+                    value={regGuardianMobileNo}
+                    onChange={(e) => setRegGuardianMobileNo(e.target.value)}
+                    placeholder="e.g. 9876543211"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+                  />
+                </div>
+
+                {/* Address */}
+                <div className="space-y-1 col-span-1 sm:col-span-2">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Residential Address *</label>
+                  <input 
+                    type="text" 
+                    value={regAddress}
+                    onChange={(e) => setRegAddress(e.target.value)}
+                    placeholder="e.g. Flat 302, Green Park Avenue, Main Road"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+                    required
+                  />
+                </div>
+
+              </div>
+
+              <div className="flex flex-col-reverse sm:flex-row gap-2.5 sm:gap-3 justify-end pt-4 border-t border-gray-100">
+                <button 
+                  type="button"
+                  onClick={() => setShowRegForm(false)}
+                  className="w-full sm:w-auto px-4 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer text-center"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="w-full sm:w-auto px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <UserPlus size={16} />
+                  <span>Create Student Profile ({nextRegFormatted})</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Edit Student Profile Modal */}
+      {showEditForm && editingStudent && userRole === 'admin' && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto transition-all">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-4 sm:p-6 space-y-5 shadow-2xl relative my-6 border border-emerald-100">
+            <button 
+              type="button"
+              onClick={() => { setShowEditForm(false); setEditingStudent(null); }}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 cursor-pointer z-10"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pb-4 border-b border-gray-100 pr-8">
+              <img src={logo} alt="KSSB FC Logo" className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border border-emerald-600 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] font-mono font-bold text-amber-600 uppercase tracking-widest block">Admin Edit Permissions Only</span>
+                <h3 className="text-lg sm:text-xl font-black text-gray-900 leading-tight">Edit Student Profile ({editingStudent.registrationNumber})</h3>
+                <p className="text-xs text-gray-500">Only Academy Admin is authorized to modify student profiles.</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveEditProfile} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+                
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Student Name</label>
+                  <input 
+                    type="text" 
+                    value={editingStudent.name}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, name: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Playing Position</label>
+                  <select 
+                    value={editingStudent.position}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, position: e.target.value as any })}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-emerald-900 bg-white"
+                  >
+                    <option value="Goalkeeper">Goalkeeper</option>
+                    <option value="Defence">Defence</option>
+                    <option value="Midfield">Midfield</option>
+                    <option value="Forward">Forward</option>
+                    <option value="Winger">Winger</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Father Name</label>
+                  <input 
+                    type="text" 
+                    value={editingStudent.fatherName || ''}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, fatherName: e.target.value, parentName: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Mother Name</label>
+                  <input 
+                    type="text" 
+                    value={editingStudent.motherName || ''}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, motherName: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">WhatsApp Mobile No</label>
+                  <input 
+                    type="tel" 
+                    value={editingStudent.mobileNo || editingStudent.parentPhone || ''}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, mobileNo: e.target.value, parentPhone: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Age</label>
+                  <input 
+                    type="number" 
+                    value={editingStudent.age}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, age: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Guardian Name</label>
+                  <input 
+                    type="text" 
+                    value={editingStudent.guardianName || ''}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, guardianName: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Guardian Mobile No</label>
+                  <input 
+                    type="tel" 
+                    value={editingStudent.guardianMobileNo || ''}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, guardianMobileNo: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-1 col-span-1 sm:col-span-2">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Address</label>
+                  <input 
+                    type="text" 
+                    value={editingStudent.address || ''}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, address: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
+                    required
+                  />
+                </div>
+
+              </div>
+
+              <div className="flex flex-col-reverse sm:flex-row gap-2.5 sm:gap-3 justify-end pt-4 border-t border-gray-100">
+                <button 
+                  type="button"
+                  onClick={() => { setShowEditForm(false); setEditingStudent(null); }}
+                  className="w-full sm:w-auto px-4 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer text-center"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="w-full sm:w-auto px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Check size={16} />
+                  <span>Save Profile Changes</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Log Daily Metric Modal */}
+      {showMetricForm && selectedStudent && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto transition-all" id="log-metric-modal">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-6 shadow-2xl relative my-8">
+            <button 
+              onClick={() => setShowMetricForm(false)}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+            <div className="space-y-1">
+              <span className="text-xs font-mono font-semibold text-emerald-600 uppercase">Performance Benchmark</span>
+              <h3 className="text-xl font-bold text-gray-900">
+                Performance Evaluation: {selectedStudent.name}
+              </h3>
+              <p className="text-xs text-gray-500">Reg No: {selectedStudent.registrationNumber} | Position: {selectedStudent.position}</p>
+            </div>
+            
+            <form onSubmit={handleLogMetric} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5 col-span-2">
+                  <label className="text-xs font-mono font-bold text-gray-700 uppercase">Training Date</label>
+                  <input 
+                    type="date" 
+                    value={metricDate}
+                    onChange={(e) => setMetricDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono font-bold text-gray-700 uppercase">40yd Sprint (sec)</label>
+                  <input 
+                    type="number" 
+                    step="0.1"
+                    value={metricSpeed}
+                    onChange={(e) => setMetricSpeed(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono font-bold text-gray-700 uppercase">Agility Shuttle (sec)</label>
+                  <input 
+                    type="number" 
+                    step="0.1"
+                    value={metricAgility}
+                    onChange={(e) => setMetricAgility(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono font-bold text-gray-700 uppercase">Stamina (1-10)</label>
+                  <input 
+                    type="number" 
+                    min={1} max={10}
+                    value={metricStamina}
+                    onChange={(e) => setMetricStamina(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono font-bold text-gray-700 uppercase">Passing (1-10)</label>
+                  <input 
+                    type="number" 
+                    min={1} max={10}
+                    value={metricPassing}
+                    onChange={(e) => setMetricPassing(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-1.5 col-span-2">
+                  <label className="text-xs font-mono font-bold text-gray-700 uppercase">Coaching Feedback Notes</label>
+                  <textarea 
+                    value={metricNotes}
+                    onChange={(e) => setMetricNotes(e.target.value)}
+                    placeholder="Provide specific constructive feedback on technique..."
+                    rows={2}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 justify-end pt-4 border-t border-gray-100">
+                <button 
+                  type="button"
+                  onClick={() => setShowMetricForm(false)}
+                  className="px-4 py-2 border border-gray-200 rounded-xl text-xs font-bold hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-700 text-white rounded-xl text-xs font-bold hover:bg-emerald-800 cursor-pointer"
+                >
+                  Save Metrics Log
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Roster Table Filter Bars */}
+      <div className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm flex flex-col sm:flex-row gap-4 justify-between" id="roster-filters-card">
+        <div className="relative max-w-sm w-full">
+          <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input 
+            type="text" 
+            placeholder="Search by student, reg no, or mobile..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:bg-white"
+          />
+        </div>
+        
+        <div className="flex items-center gap-2 overflow-x-auto">
+          <span className="text-[11px] font-mono font-bold text-gray-500 uppercase shrink-0">Position:</span>
+          <div className="flex bg-gray-50 p-1 rounded-xl border border-gray-200 shrink-0">
+            {['All', 'Goalkeeper', 'Defence', 'Midfield', 'Forward', 'Winger'].map(pos => (
+              <button
+                key={pos}
+                onClick={() => setSelectedPosFilter(pos)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+                  selectedPosFilter === pos ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                {pos}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Roster Records Grid/Table */}
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4 sm:p-0 sm:overflow-hidden" id="roster-table-card">
+        {/* Mobile Vertical Cards View */}
+        <div className="block sm:hidden space-y-3">
+          {filteredStudents.length > 0 ? (
+            filteredStudents.map(student => (
+              <div key={student.id} className="p-4 bg-gray-50/70 border border-gray-200 rounded-2xl space-y-3">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <img src={logo} alt="KSSB FC Logo" className="w-10 h-10 rounded-full border border-emerald-600 object-cover shrink-0" />
+                    <div>
+                      <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md inline-block mb-0.5">
+                        {student.registrationNumber || 'KSSBFC0001/26-27'}
+                      </span>
+                      <div className="font-bold text-gray-900 text-base">{student.name}</div>
+                    </div>
+                  </div>
+                  <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-50 text-emerald-900 border border-emerald-200 shrink-0">
+                    {student.position}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs bg-white p-3 rounded-xl border border-gray-100">
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-mono uppercase block">Father / Guardian</span>
+                    <span className="font-bold text-gray-800">{student.fatherName || student.parentName || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-mono uppercase block">WhatsApp Mobile</span>
+                    <a href={`tel:${student.mobileNo || student.parentPhone}`} className="font-mono font-bold text-emerald-700 underline">
+                      {student.mobileNo || student.parentPhone}
+                    </a>
+                  </div>
+                </div>
+
+                {student.address && (
+                  <div className="text-xs text-gray-600 bg-white/60 p-2.5 rounded-xl border border-gray-100 flex items-start gap-1.5">
+                    <MapPin size={13} className="text-gray-400 shrink-0 mt-0.5" />
+                    <span className="break-words">{student.address}</span>
+                  </div>
+                )}
+
+                {/* Card Actions */}
+                <div className="flex gap-2 pt-1 border-t border-gray-200/80">
+                  {userRole === 'admin' && (
+                    <button 
+                      onClick={() => {
+                        setEditingStudent(student);
+                        setShowEditForm(true);
+                      }}
+                      className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <Edit3 size={13} />
+                      Edit Profile
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => {
+                      setSelectedStudent(student);
+                      setShowMetricForm(true);
+                    }}
+                    className="flex-1 py-2 bg-gray-900 text-white hover:bg-gray-800 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <FileSpreadsheet size={13} />
+                    Log Drills
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-8 text-gray-500 text-xs">
+              No matching student profiles found.
+            </div>
+          )}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50/75 border-b border-gray-100">
+                <th className="p-4 text-xs font-mono font-bold text-gray-500 uppercase">Reg. Number & Student</th>
+                <th className="p-4 text-xs font-mono font-bold text-gray-500 uppercase">Position & Age</th>
+                <th className="p-4 text-xs font-mono font-bold text-gray-500 uppercase">Parents & Contact</th>
+                <th className="p-4 text-xs font-mono font-bold text-gray-500 uppercase">Address</th>
+                <th className="p-4 text-xs font-mono font-bold text-gray-500 uppercase text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filteredStudents.length > 0 ? (
+                filteredStudents.map(student => (
+                  <tr key={student.id} className="hover:bg-emerald-50/20 transition-colors">
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <img src={logo} alt="KSSB FC Logo" className="w-9 h-9 rounded-full border border-emerald-600 object-cover shrink-0" />
+                        <div>
+                          <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md inline-block mb-0.5">
+                            {student.registrationNumber || 'KSSBFC0001/26-27'}
+                          </span>
+                          <div className="font-bold text-gray-900 text-sm">{student.name}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-50 text-emerald-900 border border-emerald-200 inline-block mb-1">
+                        {student.position}
+                      </span>
+                      <div className="text-[11px] text-gray-500 font-medium">{student.age} Years Old</div>
+                    </td>
+                    <td className="p-4 text-xs">
+                      <div className="font-bold text-gray-800 flex items-center gap-1">
+                        <User size={12} className="text-gray-400" />
+                        <span>F: {student.fatherName || student.parentName || '—'}</span>
+                      </div>
+                      {student.motherName && (
+                        <div className="text-gray-500 text-[11px]">M: {student.motherName}</div>
+                      )}
+                      <div className="font-mono text-emerald-700 font-bold mt-0.5 flex items-center gap-1">
+                        <Phone size={11} />
+                        <span>{student.mobileNo || student.parentPhone}</span>
+                      </div>
+                    </td>
+                    <td className="p-4 text-xs text-gray-600 max-w-xs truncate">
+                      <div className="flex items-start gap-1">
+                        <MapPin size={12} className="text-gray-400 shrink-0 mt-0.5" />
+                        <span className="truncate">{student.address || '—'}</span>
+                      </div>
+                    </td>
+                    <td className="p-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {userRole === 'admin' && (
+                          <button 
+                            onClick={() => {
+                              setEditingStudent(student);
+                              setShowEditForm(true);
+                            }}
+                            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold shadow-sm transition-all inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <Edit3 size={13} />
+                            Edit Profile
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => {
+                            setSelectedStudent(student);
+                            setShowMetricForm(true);
+                          }}
+                          className="px-3 py-1.5 bg-gray-900 text-white hover:bg-gray-800 rounded-lg text-xs font-bold shadow-sm transition-all inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <FileSpreadsheet size={13} />
+                          Log Drills
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="text-center py-12 text-gray-500">
+                    <div className="space-y-2 max-w-sm mx-auto">
+                      <p className="text-sm font-semibold text-gray-700">No student profiles found.</p>
+                      {userRole === 'admin' ? (
+                        <p className="text-xs text-gray-400">Click <strong className="text-emerald-700">+ New Student Registration</strong> above to register student athletes.</p>
+                      ) : (
+                        <p className="text-xs text-gray-400">Please ask Admin to register student profiles.</p>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
