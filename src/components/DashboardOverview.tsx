@@ -57,26 +57,26 @@ export default function DashboardOverview({
   return (
     <div className="space-y-6" id="dashboard-overview-container">
       {/* Top Banner */}
-      <div className="p-6 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-950 rounded-2xl text-white shadow-lg relative overflow-hidden border border-slate-800" id="dashboard-hero-banner">
+      <div className="p-4 sm:p-6 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-950 rounded-2xl text-white shadow-lg relative overflow-hidden border border-slate-800" id="dashboard-hero-banner">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div className="max-w-xl space-y-3">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-yellow-500/10 text-yellow-300 border border-yellow-500/20 rounded-full text-xs font-mono font-bold uppercase tracking-wider">
               🏆 Official Club Headquarters
             </div>
-            <h1 className="text-3xl font-sans font-black tracking-tight text-white">
+            <h1 className="text-2xl sm:text-3xl font-sans font-black tracking-tight text-white">
               KSSB FC Command Center
             </h1>
-            <p className="text-slate-300 font-sans text-sm md:text-base leading-relaxed">
+            <p className="text-slate-300 font-sans text-xs sm:text-sm md:text-base leading-relaxed">
               Welcome to the Kadamtala Sporting Subhas Bhowmick Football Camp portal. Real-time tactical metrics, automated parent alerts, attendance tracking, and financial ledgers.
             </p>
           </div>
           
           {/* Logo container right in the banner */}
-          <div className="shrink-0 flex items-center justify-center p-1.5 bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 rounded-full shadow-lg ring-4 ring-yellow-400/20 w-24 h-24 md:w-28 md:h-28">
+          <div className="shrink-0 flex items-center justify-center p-1.5 bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 rounded-3xl shadow-lg ring-4 ring-yellow-400/20 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 mx-auto md:mx-0">
             <img 
               src={kssbFcLogo} 
               alt="KSSB FC Logo" 
-              className="w-full h-full object-cover rounded-full bg-slate-900"
+              className="w-full h-full object-contain rounded-2xl bg-white p-1"
               referrerPolicy="no-referrer"
             />
           </div>
@@ -127,7 +127,7 @@ export default function DashboardOverview({
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" id="dashboard-charts-row">
         {/* Skill Progression Chart */}
-        <div className="p-6 bg-white border border-gray-100 rounded-2xl shadow-sm space-y-4" id="skill-chart-card">
+        <div className="p-4 sm:p-6 bg-white border border-gray-100 rounded-2xl shadow-sm space-y-4" id="skill-chart-card">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <h2 className="text-lg font-bold text-gray-900 font-sans">Squad Physical Progression</h2>
@@ -175,7 +175,7 @@ export default function DashboardOverview({
         </div>
 
         {/* Attendance Rates Chart */}
-        <div className="p-6 bg-white border border-gray-100 rounded-2xl shadow-sm space-y-4" id="attendance-chart-card">
+        <div className="p-4 sm:p-6 bg-white border border-gray-100 rounded-2xl shadow-sm space-y-4" id="attendance-chart-card">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <h2 className="text-lg font-bold text-gray-900 font-sans">Camp Attendance Trend</h2>

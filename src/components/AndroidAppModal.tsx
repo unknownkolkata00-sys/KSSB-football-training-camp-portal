@@ -64,8 +64,8 @@ export default function AndroidAppModal({ isOpen, onClose }: AndroidAppModalProp
 
         {/* Header */}
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 p-0.5 shadow-md shrink-0">
-            <img src={kssbFcLogo} alt="KSSB FC" className="w-full h-full object-cover rounded-2xl bg-slate-950" />
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 p-0.5 shadow-md shrink-0">
+            <img src={kssbFcLogo} alt="KSSB FC" className="w-full h-full object-contain rounded-[10px] bg-white p-0.5" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">

@@ -71,7 +71,7 @@ export default function Login({ students, onLoginSuccess }: LoginProps) {
             <img 
               src={logo} 
               alt="KSSB FC Logo" 
-              className="w-20 h-20 rounded-full border-2 border-amber-400 shadow-lg object-cover bg-emerald-900" 
+              className="w-24 h-24 rounded-2xl border-2 border-amber-400 shadow-lg object-contain bg-white p-1" 
             />
           </div>
           <h1 className="text-2xl font-black tracking-tight text-white font-sans">KSSB FOOTBALL CLUB</h1>

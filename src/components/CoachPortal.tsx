@@ -131,7 +131,7 @@ export default function CoachPortal({
     <div className="space-y-6" id="coach-portal-root">
       
       {/* Coach Welcome & Sub-navigation Header */}
-      <div className="bg-emerald-950 border border-emerald-800 text-white p-6 rounded-2xl shadow-md space-y-4">
+      <div className="bg-emerald-950 border border-emerald-800 text-white p-4 sm:p-6 rounded-2xl shadow-md space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="space-y-1">
             <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-widest block">Coach Portal — KSSB FC</span>

@@ -206,11 +206,11 @@ export default function App() {
         {/* Portal Branding */}
         <div className="p-5 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 p-0.5 shadow-md shadow-emerald-950/40 shrink-0">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 p-0.5 shadow-md shadow-emerald-950/40 shrink-0">
               <img 
                 src={kssbFcLogo} 
                 alt="KSSB FC Logo" 
-                className="w-full h-full object-cover rounded-full bg-slate-950"
+                className="w-full h-full object-contain rounded-[10px] bg-white p-0.5"
                 referrerPolicy="no-referrer"
               />
             </div>
@@ -323,11 +323,11 @@ export default function App() {
         id="mobile-header"
       >
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 p-0.5 shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 p-0.5 shrink-0">
             <img 
               src={kssbFcLogo} 
               alt="KSSB FC" 
-              className="w-full h-full object-cover rounded-full bg-slate-950"
+              className="w-full h-full object-contain rounded-[8px] bg-white p-0.5"
               referrerPolicy="no-referrer"
             />
           </div>
@@ -387,7 +387,7 @@ export default function App() {
       )}
 
       {/* Content Viewport */}
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-7xl mx-auto w-full" id="main-content-viewport">
+      <main className="flex-1 p-3 sm:p-5 md:p-8 overflow-y-auto max-w-7xl mx-auto w-full min-w-0" id="main-content-viewport">
         <AnimatePresence mode="wait">
           <motion.div
             key={role + '_' + activeTab}

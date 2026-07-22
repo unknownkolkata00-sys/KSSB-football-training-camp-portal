@@ -70,7 +70,7 @@ export default function StudentPortal({
     <div className="space-y-6" id="student-portal-root">
       
       {/* Top Banner & Profile Switcher */}
-      <div className="bg-slate-900 border border-slate-800 text-white p-6 rounded-2xl shadow-lg space-y-4">
+      <div className="bg-slate-900 border border-slate-800 text-white p-4 sm:p-6 rounded-2xl shadow-lg space-y-4">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-emerald-600 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-inner font-display">
