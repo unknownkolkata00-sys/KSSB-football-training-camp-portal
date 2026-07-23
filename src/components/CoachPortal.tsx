@@ -166,7 +166,7 @@ export default function CoachPortal({
               src={kssbFcLogo || '/logo.jpg'} 
               onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }}
               alt="KSSB FC Official Crest" 
-              className="w-14 h-14 rounded-xl border-2 border-amber-400 object-contain bg-white p-0.5 shadow-md shrink-0"
+              className="w-14 h-14 rounded-xl border border-amber-400/40 object-contain bg-white p-1 shadow-md shrink-0"
               referrerPolicy="no-referrer"
             />
             <div className="space-y-1">

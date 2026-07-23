@@ -196,7 +196,7 @@ export default function RosterManagement({
       {/* Control Actions Header */}
       <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-4 md:items-center justify-between" id="roster-actions-header">
         <div className="flex items-center gap-4">
-          <img src={logo || '/logo.jpg'} onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }} alt="KSSB FC Logo" className="w-14 h-14 rounded-xl border-2 border-amber-500 object-contain bg-white p-0.5 shadow-sm shrink-0" />
+          <img src={logo || '/logo.jpg'} onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }} alt="KSSB FC Logo" className="w-14 h-14 rounded-xl border border-amber-400/40 object-contain bg-white p-1 shadow-sm shrink-0" />
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono font-bold text-emerald-700 uppercase tracking-widest">KSSB FC Registration Hub</span>

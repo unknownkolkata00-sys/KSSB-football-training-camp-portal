@@ -150,7 +150,7 @@ export default function StudentPortal({
                 src={kssbFcLogo || '/logo.jpg'} 
                 onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }}
                 alt="KSSB FC Logo" 
-                className="w-14 h-14 rounded-2xl border-2 border-amber-400 object-contain bg-white p-0.5 shadow-md shrink-0"
+                className="w-14 h-14 rounded-2xl border border-amber-400/40 object-contain bg-white p-1 shadow-md shrink-0"
                 referrerPolicy="no-referrer"
               />
             )}

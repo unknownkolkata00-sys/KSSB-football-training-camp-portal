@@ -77,12 +77,12 @@ export default function DashboardOverview({
           </div>
           
           {/* Logo container right in the banner */}
-          <div className="shrink-0 flex items-center justify-center p-1.5 bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 rounded-3xl shadow-lg ring-4 ring-yellow-400/20 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 mx-auto md:mx-0">
+          <div className="shrink-0 flex items-center justify-center p-1 bg-white/10 backdrop-blur-sm rounded-2xl border border-amber-400/40 shadow-xl w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 mx-auto md:mx-0">
             <img 
               src={kssbFcLogo || '/logo.jpg'} 
               onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }}
               alt="KSSB FC Logo" 
-              className="w-full h-full object-contain rounded-2xl bg-white p-1"
+              className="w-full h-full object-contain rounded-xl bg-white p-1"
               referrerPolicy="no-referrer"
             />
           </div>

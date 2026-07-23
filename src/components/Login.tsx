@@ -71,8 +71,8 @@ export default function Login({ students, onLoginSuccess }: LoginProps) {
             <img 
               src={logo || '/logo.jpg'} 
               onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }}
-              alt="KSSB FC Logo" 
-              className="w-24 h-24 rounded-2xl border-2 border-amber-400 shadow-lg object-contain bg-white p-1" 
+              alt="KSSB FC Official Shield Logo" 
+              className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl object-contain bg-white p-1.5 shadow-2xl border border-amber-400/30" 
             />
           </div>
           <h1 className="text-2xl font-black tracking-tight text-white font-sans">KSSB FOOTBALL CLUB</h1>

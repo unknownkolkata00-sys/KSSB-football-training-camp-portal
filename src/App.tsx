@@ -431,12 +431,12 @@ export default function App() {
         {/* Portal Branding */}
         <div className="p-5 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 p-0.5 shadow-md shadow-emerald-950/40 shrink-0">
+            <div className="w-11 h-11 rounded-xl bg-white p-0.5 shadow-md border border-amber-400/40 shrink-0">
               <img 
                 src={kssbFcLogo || '/logo.jpg'} 
                 onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }}
                 alt="KSSB FC Logo" 
-                className="w-full h-full object-contain rounded-[10px] bg-white p-0.5"
+                className="w-full h-full object-contain rounded-[8px]"
                 referrerPolicy="no-referrer"
               />
             </div>
@@ -571,12 +571,12 @@ export default function App() {
         id="mobile-header"
       >
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 p-0.5 shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-white p-0.5 border border-amber-400/40 shrink-0">
             <img 
               src={kssbFcLogo || '/logo.jpg'} 
               onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }}
               alt="KSSB FC" 
-              className="w-full h-full object-contain rounded-[8px] bg-white p-0.5"
+              className="w-full h-full object-contain rounded-[8px]"
               referrerPolicy="no-referrer"
             />
           </div>

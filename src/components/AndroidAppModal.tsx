@@ -64,12 +64,12 @@ export default function AndroidAppModal({ isOpen, onClose }: AndroidAppModalProp
 
         {/* Header */}
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 p-0.5 shadow-md shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-white p-0.5 border border-amber-400/40 shadow-md shrink-0">
             <img 
               src={kssbFcLogo || '/logo.jpg'} 
               onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }}
               alt="KSSB FC" 
-              className="w-full h-full object-contain rounded-[10px] bg-white p-0.5" 
+              className="w-full h-full object-contain rounded-[10px]" 
             />
           </div>
           <div>
