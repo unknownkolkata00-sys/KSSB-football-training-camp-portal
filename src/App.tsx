@@ -1,21 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './utils/db';
-import { Student, PerformanceMetric, FeeStatus, Tournament, InjuryReport, NotificationLog, CoachEvaluation } from './types';
+import { 
+  subscribeStudents, 
+  subscribeMetrics, 
+  subscribeFees, 
+  subscribeTournaments, 
+  subscribeInjuries, 
+  subscribeNotifications, 
+  subscribeEvaluations,
+  subscribeGallery,
+  subscribeJerseys,
+  subscribeJerseyOrders,
+  saveStudentToCloud,
+  saveMetricToCloud,
+  saveFeeToCloud,
+  saveTournamentToCloud,
+  saveInjuryToCloud,
+  saveNotificationToCloud,
+  saveEvaluationToCloud,
+  saveGalleryImageToCloud,
+  saveJerseyToCloud,
+  saveJerseyOrderToCloud,
+  seedInitialCloudDataIfEmpty
+} from './utils/firebase';
+import { Student, PerformanceMetric, FeeStatus, Tournament, InjuryReport, NotificationLog, CoachEvaluation, GalleryImage, CampJersey, JerseyOrder } from './types';
 import DashboardOverview from './components/DashboardOverview';
 import RosterManagement from './components/RosterManagement';
 import PlayerPerformanceView from './components/PlayerPerformanceView';
 import FeesTracker from './components/FeesTracker';
 import TournamentScheduler from './components/TournamentScheduler';
+import GalleryView from './components/GalleryView';
 import InjuryTracker from './components/InjuryTracker';
 import NotificationAutomator from './components/NotificationAutomator';
 import CoachPerformance from './components/CoachPerformance';
 import CoachPortal from './components/CoachPortal';
 import StudentPortal from './components/StudentPortal';
+import JerseyStoreManager from './components/JerseyStoreManager';
 import Login from './components/Login';
 import AndroidAppModal from './components/AndroidAppModal';
 import { downloadAttendanceReportCSV, downloadFeesReportCSV } from './utils/reports';
 import { AnimatePresence, motion } from 'motion/react';
-import kssbFcLogo from './assets/images/kssb_fc_logo_1784404534667.jpg';
+import kssbFcLogo from './assets/images/kssb_fc_official_logo_1784715023480.jpg';
 import { 
   Users, 
   Activity, 
@@ -36,8 +61,13 @@ import {
   LogOut,
   Smartphone,
   ArrowLeft,
-  Home
+  Camera,
+  Shirt,
+  ShoppingBag
 } from 'lucide-react';
+
+
+const AUTH_STORAGE_KEY = 'ftc_auth_session';
 
 export default function App() {
   // Sync core databases
@@ -48,82 +78,255 @@ export default function App() {
   const [injuries, setInjuries] = useState<InjuryReport[]>([]);
   const [notifications, setNotifications] = useState<NotificationLog[]>([]);
   const [evaluations, setEvaluations] = useState<CoachEvaluation[]>([]);
+  const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
+  const [jerseys, setJerseys] = useState<CampJersey[]>([]);
+  const [jerseyOrders, setJerseyOrders] = useState<JerseyOrder[]>([]);
 
-  // Authentication & Role State
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false); // Show login screen by default
-  const [role, setRole] = useState<'admin' | 'coach' | 'student'>('admin');
-  const [loggedInStudentId, setLoggedInStudentId] = useState<string>('');
+  // Authentication & Role State with LocalStorage Persistence
+
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Boolean(parsed.isAuthenticated);
+      }
+    } catch (e) {
+      console.error('Failed to parse auth session:', e);
+    }
+    return false;
+  });
+
+  const [role, setRole] = useState<'admin' | 'coach' | 'student'>(() => {
+    try {
+      const saved = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.role || 'admin';
+      }
+    } catch (e) {
+      console.error('Failed to parse auth role:', e);
+    }
+    return 'admin';
+  });
+
+  const [loggedInStudentId, setLoggedInStudentId] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.loggedInStudentId || '';
+      }
+    } catch (e) {
+      console.error('Failed to parse loggedInStudentId:', e);
+    }
+    return '';
+  });
+
   const [activeTab, setActiveTab] = useState('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showAndroidModal, setShowAndroidModal] = useState(false);
 
-  // Load baseline on mount
+  // Load baseline & Subscribe to real-time Firestore multi-handset updates
   useEffect(() => {
+    // 1. Initial Local Backup Load
     const loadedStudents = db.getStudents();
     setStudents(loadedStudents);
     setMetrics(db.getMetrics());
     setFees(db.getFees());
     setTournaments(db.getTournaments());
     setInjuries(db.getInjuries());
-    setNotifications(db.getNotifications());
-    setEvaluations(db.getEvaluations());
+    const initialNotis = db.getNotifications();
+    setNotifications(initialNotis);
+    const initialEvals = db.getEvaluations();
+    setEvaluations(initialEvals);
+    setGalleryImages(db.getGallery());
+    setJerseys(db.getJerseys());
+    setJerseyOrders(db.getJerseyOrders());
 
-    if (loadedStudents.length > 0) {
+    if (loadedStudents.length > 0 && !loggedInStudentId) {
       setLoggedInStudentId(loadedStudents[0].id);
     }
+
+
+    // 2. Seed default cloud records if cloud database is empty
+    seedInitialCloudDataIfEmpty(initialNotis, initialEvals);
+
+    // 3. Real-time Firebase Firestore subscriptions for Multi-Handset Live Sync
+    const unsubStudents = subscribeStudents((cloudStudents) => {
+      setStudents(cloudStudents);
+      db.saveStudents(cloudStudents);
+      if (cloudStudents.length > 0 && !loggedInStudentId) {
+        setLoggedInStudentId(cloudStudents[0].id);
+      }
+    });
+
+    const unsubMetrics = subscribeMetrics((cloudMetrics) => {
+      setMetrics(cloudMetrics);
+      db.saveMetrics(cloudMetrics);
+    });
+
+    const unsubFees = subscribeFees((cloudFees) => {
+      setFees(cloudFees);
+      db.saveFees(cloudFees);
+    });
+
+    const unsubTournaments = subscribeTournaments((cloudTournaments) => {
+      setTournaments(cloudTournaments);
+      db.saveTournaments(cloudTournaments);
+    });
+
+    const unsubInjuries = subscribeInjuries((cloudInjuries) => {
+      setInjuries(cloudInjuries);
+      db.saveInjuries(cloudInjuries);
+    });
+
+    const unsubNotifications = subscribeNotifications((cloudNotis) => {
+      setNotifications(cloudNotis);
+      db.saveNotifications(cloudNotis);
+    });
+
+    const unsubEvaluations = subscribeEvaluations((cloudEvals) => {
+      setEvaluations(cloudEvals);
+      db.saveEvaluations(cloudEvals);
+    });
+
+    const unsubGallery = subscribeGallery((cloudGallery) => {
+      setGalleryImages(cloudGallery);
+      db.saveGallery(cloudGallery);
+    });
+
+    const unsubJerseys = subscribeJerseys((cloudJerseys) => {
+      if (cloudJerseys.length > 0) {
+        setJerseys(cloudJerseys);
+        db.saveJerseys(cloudJerseys);
+      }
+    });
+
+    const unsubJerseyOrders = subscribeJerseyOrders((cloudOrders) => {
+      setJerseyOrders(cloudOrders);
+      db.saveJerseyOrders(cloudOrders);
+    });
+
+    return () => {
+      unsubStudents();
+      unsubMetrics();
+      unsubFees();
+      unsubTournaments();
+      unsubInjuries();
+      unsubNotifications();
+      unsubEvaluations();
+      unsubGallery();
+      unsubJerseys();
+      unsubJerseyOrders();
+    };
+
   }, []);
 
-  // Sync state helpers
+  // Sync state helpers with Dual Persistence (Local DB + Cloud Firestore)
   const handleAddStudent = (student: Omit<Student, 'id' | 'registrationDate'>) => {
-    db.addStudent(student);
+    const { newStudent, newFees } = db.addStudent(student);
     setStudents(db.getStudents());
-    setFees(db.getFees()); // Reload fees as registration auto-generates ledger tuition
+    setFees(db.getFees());
+    // Sync to Cloud Firestore
+    saveStudentToCloud(newStudent);
+    newFees.forEach(f => saveFeeToCloud(f));
   };
 
   const handleUpdateStudent = (updatedStudent: Student) => {
     db.updateStudent(updatedStudent);
     setStudents(db.getStudents());
+    saveStudentToCloud(updatedStudent);
   };
 
   const handleAddMetric = (metric: Omit<PerformanceMetric, 'id'>) => {
-    db.addMetric(metric);
+    const newMetric = db.addMetric(metric);
     setMetrics(db.getMetrics());
+    saveMetricToCloud(newMetric);
   };
 
   const handleUpdateFee = (updatedFee: FeeStatus) => {
     db.updateFee(updatedFee);
     setFees(db.getFees());
+    saveFeeToCloud(updatedFee);
   };
 
   const handleAddTournament = (tournament: Omit<Tournament, 'id'>) => {
-    db.addTournament(tournament);
+    const newTournament = db.addTournament(tournament);
     setTournaments(db.getTournaments());
+    saveTournamentToCloud(newTournament);
   };
 
   const handleUpdateTournament = (updated: Tournament) => {
     db.updateTournament(updated);
     setTournaments(db.getTournaments());
+    saveTournamentToCloud(updated);
   };
 
   const handleAddInjury = (injury: Omit<InjuryReport, 'id'>) => {
-    db.addInjury(injury);
+    const newInjury = db.addInjury(injury);
     setInjuries(db.getInjuries());
+    saveInjuryToCloud(newInjury);
   };
 
   const handleUpdateInjury = (updated: InjuryReport) => {
     db.updateInjury(updated);
     setInjuries(db.getInjuries());
+    saveInjuryToCloud(updated);
   };
 
   const handleAddNotification = (noti: Omit<NotificationLog, 'id' | 'timestamp' | 'status'>) => {
-    db.addNotification(noti);
+    const newNoti = db.addNotification(noti);
     setNotifications(db.getNotifications());
+    saveNotificationToCloud(newNoti);
   };
 
   const handleAddEvaluation = (evalItem: Omit<CoachEvaluation, 'id' | 'date'>) => {
-    db.addEvaluation(evalItem);
+    const newEval = db.addEvaluation(evalItem);
     setEvaluations(db.getEvaluations());
+    saveEvaluationToCloud(newEval);
   };
+
+  const handleAddGalleryImage = (image: Omit<GalleryImage, 'id' | 'date'>) => {
+    const newImg = db.addGalleryImage(image);
+    setGalleryImages(db.getGallery());
+    saveGalleryImageToCloud(newImg);
+  };
+
+  const handleDeleteGalleryImage = (id: string) => {
+    db.deleteGalleryImage(id);
+    setGalleryImages(db.getGallery());
+  };
+
+  const handleAddJersey = (jersey: Omit<CampJersey, 'id' | 'createdAt'>) => {
+    const newJersey = db.addJersey(jersey);
+    setJerseys(db.getJerseys());
+    saveJerseyToCloud(newJersey);
+  };
+
+  const handleUpdateJersey = (updated: CampJersey) => {
+    db.updateJersey(updated);
+    setJerseys(db.getJerseys());
+    saveJerseyToCloud(updated);
+  };
+
+  const handleDeleteJersey = (id: string) => {
+    db.deleteJersey(id);
+    setJerseys(db.getJerseys());
+  };
+
+  const handlePlaceJerseyOrder = (order: Omit<JerseyOrder, 'id' | 'orderDate'>) => {
+    const newOrder = db.addJerseyOrder(order);
+    setJerseyOrders(db.getJerseyOrders());
+    saveJerseyOrderToCloud(newOrder);
+  };
+
+  const handleUpdateJerseyOrder = (updated: JerseyOrder) => {
+    db.updateJerseyOrder(updated);
+    setJerseyOrders(db.getJerseyOrders());
+    saveJerseyOrderToCloud(updated);
+  };
+
 
   // Secure Master Reporting Export (Admin Only)
   const triggerMasterExport = () => {
@@ -170,15 +373,24 @@ export default function App() {
     { id: 'dashboard', label: 'Overview Dashboard', icon: LayoutDashboard },
     { id: 'roster', label: 'New Registration & Roster', icon: Users },
     { id: 'fees', label: 'Fees Record (Ledger)', icon: CreditCard },
+    { id: 'store', label: 'Camp Jersey Store & Orders', icon: Shirt },
     { id: 'performance', label: 'Attendance & Reviews', icon: Target },
+    { id: 'tournaments', label: 'Match Fixtures & Team Selection', icon: Trophy },
+    { id: 'gallery', label: 'Photo Vault Gallery', icon: Camera },
     { id: 'notifications', label: 'Mobile Comms / SMS', icon: Send },
     { id: 'evaluations', label: 'Coach Evaluations', icon: Award }
   ];
+
 
   // Handle Sign Out / Log Out
   const handleLogOut = () => {
     setIsAuthenticated(false);
     setLoggedInStudentId('');
+    try {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+    } catch (e) {
+      console.error('Failed to clear auth session:', e);
+    }
   };
 
   if (!isAuthenticated) {
@@ -188,8 +400,18 @@ export default function App() {
         onLoginSuccess={(newRole, student) => {
           setRole(newRole);
           setIsAuthenticated(true);
-          if (student) {
-            setLoggedInStudentId(student.id);
+          const studentId = student ? student.id : '';
+          if (studentId) {
+            setLoggedInStudentId(studentId);
+          }
+          try {
+            localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
+              isAuthenticated: true,
+              role: newRole,
+              loggedInStudentId: studentId
+            }));
+          } catch (e) {
+            console.error('Failed to save auth session:', e);
           }
         }}
       />
@@ -483,13 +705,36 @@ export default function App() {
                   />
                 )}
 
+                {activeTab === 'store' && (
+                  <JerseyStoreManager
+                    jerseys={jerseys}
+                    orders={jerseyOrders}
+                    students={students}
+                    onAddJersey={handleAddJersey}
+                    onUpdateJersey={handleUpdateJersey}
+                    onDeleteJersey={handleDeleteJersey}
+                    onUpdateOrder={handleUpdateJerseyOrder}
+                  />
+                )}
+
                 {activeTab === 'tournaments' && (
                   <TournamentScheduler 
+
                     tournaments={tournaments}
                     students={students}
+                    metrics={metrics}
                     userRole="admin"
                     onAddTournament={handleAddTournament}
                     onUpdateTournament={handleUpdateTournament}
+                  />
+                )}
+
+                {activeTab === 'gallery' && (
+                  <GalleryView 
+                    galleryImages={galleryImages}
+                    onAddImage={handleAddGalleryImage}
+                    onDeleteImage={handleDeleteGalleryImage}
+                    role="admin"
                   />
                 )}
 
@@ -524,7 +769,10 @@ export default function App() {
                 students={students}
                 metrics={metrics}
                 fees={fees}
+                tournaments={tournaments}
+                galleryImages={galleryImages}
                 onAddMetric={handleAddMetric}
+                onUpdateTournament={handleUpdateTournament}
               />
             )}
 
@@ -535,11 +783,16 @@ export default function App() {
                 metrics={metrics}
                 fees={fees}
                 tournaments={tournaments}
+                galleryImages={galleryImages}
+                jerseys={jerseys}
+                orders={jerseyOrders}
                 loggedInStudentId={loggedInStudentId}
                 onSelectStudent={setLoggedInStudentId}
                 onUpdateFee={handleUpdateFee}
+                onPlaceOrder={handlePlaceJerseyOrder}
               />
             )}
+
           </motion.div>
         </AnimatePresence>
       </main>

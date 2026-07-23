@@ -1,4 +1,4 @@
-import { Student, PerformanceMetric, FeeStatus, Tournament, InjuryReport, NotificationLog, CoachEvaluation } from '../types';
+import { Student, PerformanceMetric, FeeStatus, Tournament, InjuryReport, NotificationLog, CoachEvaluation, GalleryImage, CampJersey, JerseyOrder } from '../types';
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -8,7 +8,10 @@ const STORAGE_KEYS = {
   TOURNAMENTS: 'ftc_tournaments',
   INJURIES: 'ftc_injuries',
   NOTIFICATIONS: 'ftc_notifications',
-  COACH_EVALS: 'ftc_coach_evals'
+  COACH_EVALS: 'ftc_coach_evals',
+  GALLERY: 'ftc_gallery',
+  JERSEYS: 'ftc_jerseys',
+  JERSEY_ORDERS: 'ftc_jersey_orders'
 };
 
 // Initial Seed Data - Student list empty by default for Admin registration
@@ -21,6 +24,21 @@ const SEED_FEES: FeeStatus[] = [];
 const SEED_TOURNAMENTS: Tournament[] = [];
 
 const SEED_INJURIES: InjuryReport[] = [];
+
+const SEED_JERSEYS: CampJersey[] = [
+  {
+    id: 'j1',
+    name: 'KSSB FC Official Camp Jersey 2026',
+    description: 'Official Kadamtala Subhas Bhowmick FC high-performance breathable football kit with club crest.',
+    imageUrl: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1000&q=80',
+    price: 550,
+    availableSizes: ['6yrs', '8yrs', '10yrs', '12yrs', '14yrs', '15yrs', '16yrs'],
+    isAvailable: true,
+    createdAt: '2026-07-01'
+  }
+];
+
+const SEED_JERSEY_ORDERS: JerseyOrder[] = [];
 
 const SEED_NOTIFICATIONS: NotificationLog[] = [
   { id: 'n1', title: 'Practice Cancellation - Thunderstorms', message: 'Hi Parents, due to active severe weather warnings and lightning, tonight\'s training session (July 16) is CANCELLED. Stay safe! - Coach Abedemi Faniyan', recipientGroup: 'All Parents', timestamp: '2026-07-16 16:30', method: 'Both', status: 'Delivered' },
@@ -35,6 +53,36 @@ const SEED_COACH_EVALS: CoachEvaluation[] = [
     avgAttendance: 92,
     overallRating: 4.8,
     aiReport: '### KSSB FC Professional Coach Evaluation Report\n\n**Coach Profile:** Coach Abedemi Faniyan (Head Coach - U16)\n\n**Evaluation Period:** June 2026\n\n---\n\n### 📈 Quantitative Performance Summary\n- **Sessions Scheduled:** 12 sessions completed.\n- **Average Player Attendance:** 92.4% (Exemplary involvement)\n- **Student Growth Margin:** +14.2% average improvement across speed, agility, and stamina parameters.\n- **Overall Rating Score:** **4.8 / 5.0**\n\n### ⚽ Core Strengths\n1. **Technical Proficiency:** Drills focus highly on game-realistic transitions. Passing accuracy across the squad improved by an average of 1.1 points on our standard 1-10 rating scale.\n2. **Parent Engagement:** Implemented automated announcements effectively. Weather communication was proactive.\n3. **Safety Focus:** Quick action taken regarding Virgil van Dijk’s knee strain, coordinating directly with the team physiotherapist.\n\n### 💡 Recommendations & Action Plan\n- Introduce structured cool-down sessions of at least 15 minutes to minimize soft-tissue strain, especially with high-tempo training.\n- Incorporate tactical video analysis once per month for the defensive line to align offside trap movements.'
+  }
+];
+
+const SEED_GALLERY: GalleryImage[] = [
+  {
+    id: 'g1',
+    title: 'KSSB FC Youth League Victory',
+    category: 'Matches',
+    imageUrl: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80',
+    date: '2026-07-10',
+    uploadedBy: 'Admin',
+    caption: 'Celebration after securing 3 points in the U-16 Kolkata Zonal Championship.'
+  },
+  {
+    id: 'g2',
+    title: 'Morning Tactical Drills & Agility Session',
+    category: 'Training',
+    imageUrl: 'https://images.unsplash.com/photo-1526232761682-d26e03ac148e?auto=format&fit=crop&w=1200&q=80',
+    date: '2026-07-15',
+    uploadedBy: 'Admin',
+    caption: 'High-intensity cone shuttle and passing combination drills led by Head Coach Abedemi.'
+  },
+  {
+    id: 'g3',
+    title: 'Annual Boot & Jersey Distribution Ceremony',
+    category: 'Events',
+    imageUrl: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80',
+    date: '2026-07-01',
+    uploadedBy: 'Admin',
+    caption: 'KSSB FC management presenting official club kits to enrolled student athletes.'
   }
 ];
 
@@ -81,27 +129,27 @@ export const db = {
       registrationDate: new Date().toISOString().split('T')[0],
     };
     db.saveStudents([...students, newStudent]);
-    // Create baseline fees (Admission Fee: ₹350 and July Tuition Fee: ₹150)
+    // Create baseline fees (Registration Fee: ₹350 and July Tuition Fee: ₹150)
     const currentMonth = "July 2026";
     const fees = db.getFees();
-    db.saveFees([
-      ...fees,
-      {
-        id: 'f_adm_' + Date.now(),
-        studentId: newStudent.id,
-        month: 'Admission Fee',
-        amount: 350,
-        status: 'Pending'
-      },
-      {
-        id: 'f_mon_' + Date.now(),
-        studentId: newStudent.id,
-        month: currentMonth,
-        amount: 150,
-        status: 'Pending'
-      }
-    ]);
-    return newStudent;
+    const f1: FeeStatus = {
+      id: 'f_reg_' + Date.now(),
+      studentId: newStudent.id,
+      feeType: 'Registration',
+      month: 'Registration Fee',
+      amount: 350,
+      status: 'Pending'
+    };
+    const f2: FeeStatus = {
+      id: 'f_mon_' + Date.now(),
+      studentId: newStudent.id,
+      feeType: 'Monthly',
+      month: currentMonth,
+      amount: 150,
+      status: 'Pending'
+    };
+    db.saveFees([...fees, f1, f2]);
+    return { newStudent, newFees: [f1, f2] };
   },
   updateStudent: (updated: Student) => {
     const students = db.getStudents();
@@ -127,11 +175,46 @@ export const db = {
     const raw = getLocalStorageData<FeeStatus>(STORAGE_KEYS.FEES, SEED_FEES);
     const students = db.getStudents();
     const validStudentIds = new Set(students.map(s => s.id));
-    const cleaned = raw.filter(f => validStudentIds.has(f.studentId));
-    if (cleaned.length !== raw.length) {
-      saveLocalStorageData(STORAGE_KEYS.FEES, cleaned);
+    
+    // Normalize existing fees: map "Admission Fee" to "Registration Fee"
+    let modified = false;
+    let normalized = raw
+      .filter(f => validStudentIds.has(f.studentId))
+      .map(f => {
+        if (f.month === 'Admission Fee') {
+          modified = true;
+          return { ...f, month: 'Registration Fee', feeType: 'Registration' as const };
+        }
+        if (f.month === 'Registration Fee' && !f.feeType) {
+          modified = true;
+          return { ...f, feeType: 'Registration' as const };
+        }
+        if (f.month !== 'Registration Fee' && !f.feeType) {
+          return { ...f, feeType: 'Monthly' as const };
+        }
+        return f;
+      });
+
+    // Ensure every student has a Registration Fee record
+    students.forEach(student => {
+      const hasRegFee = normalized.some(f => f.studentId === student.id && (f.feeType === 'Registration' || f.month === 'Registration Fee'));
+      if (!hasRegFee) {
+        modified = true;
+        normalized.push({
+          id: 'f_reg_' + student.id + '_' + Date.now(),
+          studentId: student.id,
+          feeType: 'Registration',
+          month: 'Registration Fee',
+          amount: 350,
+          status: 'Pending'
+        });
+      }
+    });
+
+    if (modified || normalized.length !== raw.length) {
+      saveLocalStorageData(STORAGE_KEYS.FEES, normalized);
     }
-    return cleaned;
+    return normalized;
   },
   saveFees: (data: FeeStatus[]) => saveLocalStorageData(STORAGE_KEYS.FEES, data),
   updateFee: (updated: FeeStatus) => {
@@ -201,5 +284,65 @@ export const db = {
     };
     db.saveEvaluations([newEval, ...evals]);
     return newEval;
+  },
+
+  // Gallery
+  getGallery: () => getLocalStorageData<GalleryImage>(STORAGE_KEYS.GALLERY, SEED_GALLERY),
+  saveGallery: (data: GalleryImage[]) => saveLocalStorageData(STORAGE_KEYS.GALLERY, data),
+  addGalleryImage: (image: Omit<GalleryImage, 'id' | 'date'>) => {
+    const gallery = db.getGallery();
+    const newImage: GalleryImage = {
+      ...image,
+      id: 'g_' + Date.now(),
+      date: new Date().toISOString().split('T')[0]
+    };
+    db.saveGallery([newImage, ...gallery]);
+    return newImage;
+  },
+  deleteGalleryImage: (id: string) => {
+    const gallery = db.getGallery();
+    const updated = gallery.filter(g => g.id !== id);
+    db.saveGallery(updated);
+  },
+
+  // Camp Jerseys
+  getJerseys: () => getLocalStorageData<CampJersey>(STORAGE_KEYS.JERSEYS, SEED_JERSEYS),
+  saveJerseys: (data: CampJersey[]) => saveLocalStorageData(STORAGE_KEYS.JERSEYS, data),
+  addJersey: (jersey: Omit<CampJersey, 'id' | 'createdAt'>) => {
+    const jerseys = db.getJerseys();
+    const newJersey: CampJersey = {
+      ...jersey,
+      id: 'j_' + Date.now(),
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+    db.saveJerseys([newJersey, ...jerseys]);
+    return newJersey;
+  },
+  updateJersey: (updated: CampJersey) => {
+    const jerseys = db.getJerseys();
+    db.saveJerseys(jerseys.map(j => j.id === updated.id ? updated : j));
+  },
+  deleteJersey: (id: string) => {
+    const jerseys = db.getJerseys();
+    db.saveJerseys(jerseys.filter(j => j.id !== id));
+  },
+
+  // Jersey Orders
+  getJerseyOrders: () => getLocalStorageData<JerseyOrder>(STORAGE_KEYS.JERSEY_ORDERS, SEED_JERSEY_ORDERS),
+  saveJerseyOrders: (data: JerseyOrder[]) => saveLocalStorageData(STORAGE_KEYS.JERSEY_ORDERS, data),
+  addJerseyOrder: (order: Omit<JerseyOrder, 'id' | 'orderDate'>) => {
+    const orders = db.getJerseyOrders();
+    const newOrder: JerseyOrder = {
+      ...order,
+      id: 'jo_' + Date.now(),
+      orderDate: new Date().toISOString().split('T')[0]
+    };
+    db.saveJerseyOrders([newOrder, ...orders]);
+    return newOrder;
+  },
+  updateJerseyOrder: (updated: JerseyOrder) => {
+    const orders = db.getJerseyOrders();
+    db.saveJerseyOrders(orders.map(o => o.id === updated.id ? updated : o));
   }
 };
+

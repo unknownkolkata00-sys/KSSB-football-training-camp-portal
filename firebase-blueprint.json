@@ -1,0 +1,125 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "Registered athlete profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "registrationNumber": { "type": "string" },
+        "name": { "type": "string" },
+        "fatherName": { "type": "string" },
+        "motherName": { "type": "string" },
+        "address": { "type": "string" },
+        "mobileNo": { "type": "string" },
+        "guardianName": { "type": "string" },
+        "guardianMobileNo": { "type": "string" },
+        "position": { "type": "string" },
+        "age": { "type": "number" },
+        "parentName": { "type": "string" },
+        "parentEmail": { "type": "string" },
+        "parentPhone": { "type": "string" },
+        "registrationDate": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["name", "position"]
+    },
+    "PerformanceMetric": {
+      "title": "PerformanceMetric",
+      "description": "Daily attendance and drill score",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "date": { "type": "string" },
+        "markedAt": { "type": "number" },
+        "speed": { "type": "number" },
+        "agility": { "type": "number" },
+        "stamina": { "type": "number" },
+        "passing": { "type": "number" },
+        "shooting": { "type": "number" },
+        "defense": { "type": "number" },
+        "attendance": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["studentId", "date", "attendance"]
+    },
+    "FeeStatus": {
+      "title": "FeeStatus",
+      "description": "Tuition and admission fee records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "month": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string" },
+        "paymentDate": { "type": "string" },
+        "paymentMethod": { "type": "string" }
+      },
+      "required": ["studentId", "month", "amount", "status"]
+    },
+    "Tournament": {
+      "title": "Tournament",
+      "description": "Match fixtures and selected squad",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "opponent": { "type": "string" },
+        "location": { "type": "string" },
+        "ageGroup": { "type": "string" },
+        "departureTime": { "type": "string" },
+        "status": { "type": "string" },
+        "selectedSquad": { "type": "array", "items": { "type": "string" } },
+        "startingEleven": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["title", "date"]
+    },
+    "InjuryReport": {
+      "title": "InjuryReport",
+      "description": "Injury log and medical recovery",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "injuryType": { "type": "string" },
+        "dateOfInjury": { "type": "string" },
+        "expectedReturn": { "type": "string" },
+        "status": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["studentId", "injuryType"]
+    },
+    "NotificationLog": {
+      "title": "NotificationLog",
+      "description": "SMS and Email announcements",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "recipientGroup": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "method": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["title", "message"]
+    },
+    "CoachEvaluation": {
+      "title": "CoachEvaluation",
+      "description": "Monthly coach evaluation report",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "sessionsCount": { "type": "number" },
+        "avgAttendance": { "type": "number" },
+        "overallRating": { "type": "number" },
+        "aiReport": { "type": "string" }
+      },
+      "required": ["date"]
+    }
+  }
+}

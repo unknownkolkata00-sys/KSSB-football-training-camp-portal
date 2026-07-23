@@ -1,21 +1,30 @@
 import React, { useState } from 'react';
-import { Student, PerformanceMetric, FeeStatus } from '../types';
-import { UserCheck, Activity, CreditCard, Lock, CheckCircle2, Clock, Check, Phone, Award, ArrowLeft } from 'lucide-react';
+import { Student, PerformanceMetric, FeeStatus, Tournament, GalleryImage } from '../types';
+import { UserCheck, Activity, CreditCard, Lock, CheckCircle2, Clock, Check, Phone, Award, ArrowLeft, Trophy, Camera } from 'lucide-react';
+import TournamentScheduler from './TournamentScheduler';
+import GalleryView from './GalleryView';
+import kssbFcLogo from '../assets/images/kssb_fc_official_logo_1784715023480.jpg';
 
 interface CoachPortalProps {
   students: Student[];
   metrics: PerformanceMetric[];
   fees: FeeStatus[];
+  tournaments?: Tournament[];
+  galleryImages?: GalleryImage[];
   onAddMetric: (metric: Omit<PerformanceMetric, 'id'>) => void;
+  onUpdateTournament?: (tournament: Tournament) => void;
 }
 
 export default function CoachPortal({
   students,
   metrics,
   fees,
-  onAddMetric
+  tournaments = [],
+  galleryImages = [],
+  onAddMetric,
+  onUpdateTournament
 }: CoachPortalProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'attendance' | 'performance' | 'pending_fees'>('attendance');
+  const [activeSubTab, setActiveSubTab] = useState<'attendance' | 'performance' | 'tournaments' | 'gallery' | 'pending_fees'>('attendance');
 
   // Attendance Marking State
   const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
@@ -41,18 +50,18 @@ export default function CoachPortal({
   // Feedback Alert State
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Check if attendance for student on sessionDate was marked > 2 hours ago
+  // Check if attendance for student on sessionDate was marked > 30 minutes ago
   const isAttendanceLocked = (studentId: string) => {
     const existing = metrics.find(m => m.studentId === studentId && m.date === sessionDate);
     if (!existing || !existing.markedAt) return false;
-    const diffHours = (Date.now() - existing.markedAt) / (1000 * 60 * 60);
-    return diffHours > 2;
+    const diffMins = (Date.now() - existing.markedAt) / (1000 * 60);
+    return diffMins > 30;
   };
 
   // Toggle single player attendance status for batch entry
   const handleAttendanceToggle = (studentId: string, status: 'Present' | 'Absent' | 'Excused') => {
     if (isAttendanceLocked(studentId)) {
-      setAlert({ type: 'error', message: 'Attendance once marked cannot be changed after 2 hours from the time it was recorded!' });
+      setAlert({ type: 'error', message: 'Attendance once marked cannot be changed after 30 minutes from the time it was recorded!' });
       return;
     }
     setAttendanceRecords(prev => ({
@@ -92,7 +101,7 @@ export default function CoachPortal({
     if (lockedCount > 0) {
       setAlert({ 
         type: 'error', 
-        message: `Saved attendance for ${savedCount} students. ${lockedCount} student records were locked (>2hrs since initial marking) and could not be edited.` 
+        message: `Saved attendance for ${savedCount} students. ${lockedCount} student records were locked (>30 mins since initial marking) and could not be edited.` 
       });
     } else {
       setAlert({ type: 'success', message: `Successfully logged training attendance for ${students.length} athletes on ${sessionDate}!` });
@@ -152,15 +161,23 @@ export default function CoachPortal({
       {/* Coach Welcome & Sub-navigation Header */}
       <div className="bg-emerald-950 border border-emerald-800 text-white p-4 sm:p-6 rounded-2xl shadow-md space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="space-y-1">
-            <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-widest block">Coach Portal — KSSB FC</span>
-            <h2 className="text-2xl font-bold font-sans flex items-center gap-2">
-              <Award className="text-amber-400 shrink-0" size={26} />
-              Welcome, Coach Abedemi Faniyan
-            </h2>
-            <p className="text-xs text-emerald-200">
-              Manage daily player attendance, record physical & technical drill reviews, monitor pending tuition dues, and select match squads.
-            </p>
+          <div className="flex items-center gap-3.5">
+            <img 
+              src={kssbFcLogo || '/logo.jpg'} 
+              onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }}
+              alt="KSSB FC Official Crest" 
+              className="w-14 h-14 rounded-xl border-2 border-amber-400 object-contain bg-white p-0.5 shadow-md shrink-0"
+              referrerPolicy="no-referrer"
+            />
+            <div className="space-y-1">
+              <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-widest block">Coach Portal — KSSB FC</span>
+              <h2 className="text-xl sm:text-2xl font-bold font-sans flex items-center gap-2">
+                Welcome, Coach Abedemi Faniyan
+              </h2>
+              <p className="text-xs text-emerald-200">
+                Manage daily player attendance, record physical & technical drill reviews, monitor pending tuition dues, and select match squads.
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 bg-emerald-900/80 p-2 rounded-xl border border-emerald-700/60 text-xs">
@@ -179,6 +196,26 @@ export default function CoachPortal({
           >
             <UserCheck size={16} />
             Attendance Marking
+          </button>
+
+          <button 
+            onClick={() => setActiveSubTab('tournaments')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              activeSubTab === 'tournaments' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-emerald-900/50 text-emerald-200 hover:bg-emerald-900'
+            }`}
+          >
+            <Trophy size={16} />
+            Team Squad Selection
+          </button>
+
+          <button 
+            onClick={() => setActiveSubTab('gallery')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              activeSubTab === 'gallery' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-emerald-900/50 text-emerald-200 hover:bg-emerald-900'
+            }`}
+          >
+            <Camera size={16} />
+            Photo Gallery
           </button>
 
           <button 
@@ -282,7 +319,7 @@ export default function CoachPortal({
                       {locked ? (
                         <div className="flex items-center justify-center gap-1.5 p-2 bg-gray-100 text-gray-500 rounded-xl text-xs font-bold border border-gray-200">
                           <Lock size={14} className="text-amber-600" />
-                          <span>Locked ({currentStatus}) — Marked &gt;2 hrs ago</span>
+                          <span>Locked ({currentStatus}) — Marked &gt;30 mins ago</span>
                         </div>
                       ) : (
                         <div className="grid grid-cols-3 gap-2 pt-1">
@@ -355,7 +392,7 @@ export default function CoachPortal({
                           {locked ? (
                             <div className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-500 rounded-lg text-xs font-bold border border-gray-200">
                               <Lock size={14} className="text-amber-600" />
-                              <span>Locked ({currentStatus}) — Marked &gt;2 hrs ago</span>
+                              <span>Locked ({currentStatus}) — Marked &gt;30 mins ago</span>
                             </div>
                           ) : (
                             <div className="flex justify-center gap-1.5">
@@ -579,7 +616,29 @@ export default function CoachPortal({
         </div>
       )}
 
-      {/* 3. PENDING FEES OF STUDENTS */}
+      {/* 3. TEAM SQUAD SELECTION */}
+      {activeSubTab === 'tournaments' && (
+        <TournamentScheduler 
+          tournaments={tournaments}
+          students={students}
+          metrics={metrics}
+          userRole="coach"
+          onAddTournament={() => {}}
+          onUpdateTournament={onUpdateTournament || (() => {})}
+        />
+      )}
+
+      {/* 4. PHOTO GALLERY (COACH VIEW ONLY) */}
+      {activeSubTab === 'gallery' && (
+        <GalleryView 
+          galleryImages={galleryImages}
+          onAddImage={() => {}}
+          onDeleteImage={() => {}}
+          role="coach"
+        />
+      )}
+
+      {/* 5. PENDING FEES OF STUDENTS */}
       {activeSubTab === 'pending_fees' && (
         <div className="bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 space-y-6 shadow-sm">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-gray-100">

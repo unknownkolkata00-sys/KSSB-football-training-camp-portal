@@ -2,7 +2,7 @@ import React from 'react';
 import { Student, PerformanceMetric, FeeStatus } from '../types';
 import { Users, CreditCard, Activity, CheckCircle, ArrowRight, Download, FileText, CalendarCheck, IndianRupee } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend } from 'recharts';
-import kssbFcLogo from '../assets/images/kssb_fc_logo_1784404534667.jpg';
+import kssbFcLogo from '../assets/images/kssb_fc_official_logo_1784715023480.jpg';
 import { downloadAttendanceReportCSV, downloadFeesReportCSV } from '../utils/reports';
 
 interface DashboardOverviewProps {
@@ -21,11 +21,15 @@ export default function DashboardOverview({
   // Stats calculations
   const totalRoster = students.filter(s => s.status === 'Active').length;
   
-  // Fee stats
-  const julyFees = fees.filter(f => f.month === 'July 2026');
-  const expectedFees = julyFees.reduce((sum, f) => sum + f.amount, 0);
-  const collectedFees = julyFees.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);
-  const pendingFees = julyFees.filter(f => f.status === 'Pending' || f.status === 'Overdue').reduce((sum, f) => sum + f.amount, 0);
+  // Fee stats calculation
+  const regFees = fees.filter(f => f.feeType === 'Registration' || f.month === 'Registration Fee');
+  const monthlyFees = fees.filter(f => f.feeType !== 'Registration' && f.month !== 'Registration Fee');
+
+  const regCollected = regFees.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);
+  const regPending = regFees.filter(f => f.status !== 'Paid').reduce((sum, f) => sum + f.amount, 0);
+
+  const monthlyCollected = monthlyFees.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);
+  const monthlyPending = monthlyFees.filter(f => f.status !== 'Paid').reduce((sum, f) => sum + f.amount, 0);
 
   // Calculate Average Team Attendance
   const recentDates = [...new Set(metrics.map(m => m.date))].sort().slice(-5);
@@ -87,41 +91,95 @@ export default function DashboardOverview({
         <div className="absolute right-1/4 bottom-0 w-60 h-60 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
       </div>
 
-      {/* Grid Indicators */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4" id="stats-indicators-grid">
+      {/* Financial & Roster Stats Indicators Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5" id="stats-indicators-grid">
         {/* Roster Card */}
         <div 
           onClick={() => setActiveTab('roster')}
-          className="p-5 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer flex justify-between items-center group"
+          className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
           id="stat-card-roster"
         >
-          <div className="space-y-1">
-            <span className="text-xs font-mono text-gray-500 uppercase tracking-wider">Active Enrolled Roster</span>
-            <div className="text-3xl font-bold text-gray-900">{totalRoster} Student Athletes</div>
-            <span className="text-xs text-emerald-600 font-medium inline-flex items-center gap-1">
-              Manage player profiles & registration &rarr;
-            </span>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-mono text-gray-500 uppercase tracking-wider font-bold">Active Roster</span>
+            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+              <Users size={18} />
+            </div>
           </div>
-          <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-xl">
-            <Users size={28} />
+          <div>
+            <div className="text-2xl font-black text-gray-900">{totalRoster}</div>
+            <span className="text-[10px] text-emerald-600 font-bold">Student Athletes &rarr;</span>
           </div>
         </div>
 
-        {/* Financial Card */}
+        {/* Registration Fee Collected */}
         <div 
           onClick={() => setActiveTab('fees')}
-          className="p-5 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer flex justify-between items-center group"
-          id="stat-card-fees"
+          className="p-4 bg-white border border-emerald-100 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group bg-gradient-to-br from-white to-emerald-50/30"
+          id="stat-card-reg-collected"
         >
-          <div className="space-y-1">
-            <span className="text-xs font-mono text-gray-500 uppercase tracking-wider">Tuition Fees Summary</span>
-            <div className="text-3xl font-bold text-gray-900">₹{collectedFees} Collected</div>
-            <span className="text-xs text-amber-600 font-medium inline-flex items-center gap-1">
-              Pending Dues: ₹{pendingFees} (Total Expected: ₹{expectedFees}) &rarr;
-            </span>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-mono text-emerald-800 uppercase tracking-wider font-bold">Reg Fee Collected</span>
+            <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl">
+              <CreditCard size={18} />
+            </div>
           </div>
-          <div className="p-3.5 bg-amber-50 text-amber-600 rounded-xl">
-            <CreditCard size={28} />
+          <div>
+            <div className="text-2xl font-black text-emerald-900">₹{regCollected}</div>
+            <span className="text-[10px] text-emerald-700 font-bold">₹350 One-Time Fee &rarr;</span>
+          </div>
+        </div>
+
+        {/* Registration Fee Pending */}
+        <div 
+          onClick={() => setActiveTab('fees')}
+          className="p-4 bg-white border border-amber-100 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group bg-gradient-to-br from-white to-amber-50/30"
+          id="stat-card-reg-pending"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-mono text-amber-800 uppercase tracking-wider font-bold">Reg Fee Pending</span>
+            <div className="p-2 bg-amber-100 text-amber-700 rounded-xl">
+              <CreditCard size={18} />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-amber-900">₹{regPending}</div>
+            <span className="text-[10px] text-amber-700 font-bold">Awaiting ₹350 Payment &rarr;</span>
+          </div>
+        </div>
+
+        {/* Monthly Fee Collected */}
+        <div 
+          onClick={() => setActiveTab('fees')}
+          className="p-4 bg-white border border-indigo-100 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group bg-gradient-to-br from-white to-indigo-50/30"
+          id="stat-card-monthly-collected"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-mono text-indigo-800 uppercase tracking-wider font-bold">Monthly Fee Collected</span>
+            <div className="p-2 bg-indigo-100 text-indigo-700 rounded-xl">
+              <IndianRupee size={18} />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-indigo-900">₹{monthlyCollected}</div>
+            <span className="text-[10px] text-indigo-700 font-bold">₹150 / Month Training &rarr;</span>
+          </div>
+        </div>
+
+        {/* Monthly Fee Pending */}
+        <div 
+          onClick={() => setActiveTab('fees')}
+          className="p-4 bg-white border border-rose-100 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group bg-gradient-to-br from-white to-rose-50/30"
+          id="stat-card-monthly-pending"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-mono text-rose-800 uppercase tracking-wider font-bold">Monthly Fee Pending</span>
+            <div className="p-2 bg-rose-100 text-rose-700 rounded-xl">
+              <IndianRupee size={18} />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-rose-900">₹{monthlyPending}</div>
+            <span className="text-[10px] text-rose-700 font-bold">Outstanding Training Fees &rarr;</span>
           </div>
         </div>
       </div>

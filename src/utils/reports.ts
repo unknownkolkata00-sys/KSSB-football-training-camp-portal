@@ -131,9 +131,18 @@ export function downloadFeesReportCSV(students: Student[], fees: FeeStatus[], se
     ? fees.filter(f => f.month === selectedMonth) 
     : fees;
 
+  const regFees = filteredFees.filter(f => f.feeType === 'Registration' || f.month === 'Registration Fee');
+  const monthlyFees = filteredFees.filter(f => f.feeType !== 'Registration' && f.month !== 'Registration Fee');
+
+  const regCollected = regFees.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);
+  const regPending = regFees.filter(f => f.status !== 'Paid').reduce((sum, f) => sum + f.amount, 0);
+
+  const monthlyCollected = monthlyFees.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);
+  const monthlyPending = monthlyFees.filter(f => f.status !== 'Paid').reduce((sum, f) => sum + f.amount, 0);
+
   const totalDues = filteredFees.reduce((sum, f) => sum + f.amount, 0);
-  const totalCollected = filteredFees.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);
-  const totalOutstanding = filteredFees.filter(f => f.status !== 'Paid').reduce((sum, f) => sum + f.amount, 0);
+  const totalCollected = regCollected + monthlyCollected;
+  const totalOutstanding = regPending + monthlyPending;
   const paidCount = filteredFees.filter(f => f.status === 'Paid').length;
   const pendingCount = filteredFees.filter(f => f.status === 'Pending').length;
   const overdueCount = filteredFees.filter(f => f.status === 'Overdue').length;
@@ -141,33 +150,38 @@ export function downloadFeesReportCSV(students: Student[], fees: FeeStatus[], se
   const lines: string[] = [];
 
   // Title Header
-  lines.push(`"KADAMTALA SPORTING SUBHAS BHOWMICK FOOTBALL CAMP (KSSB FC)"`);
+  lines.push(`"KADAMTALA SPORTING SUBHAS BHOWMICK FOOTBALL CLUB (KSSB FC)"`);
   lines.push(`"FINANCIAL LEDGER & FEES COLLECTION SUMMARY REPORT"`);
-  lines.push(`"Billing Period Focus: ${selectedMonth || 'All Months'}"`);
+  lines.push(`"Billing Period Focus: ${selectedMonth || 'All Records'}"`);
   lines.push(`"Report Generated On: ${new Date().toLocaleString()}"`);
+  lines.push(`"Registration Fee Collected: ₹${regCollected}","Registration Fee Pending: ₹${regPending}"`);
+  lines.push(`"Monthly Fee Collected: ₹${monthlyCollected}","Monthly Fee Pending: ₹${monthlyPending}"`);
   lines.push(`"Total Records: ${filteredFees.length}","Total Dues: ₹${totalDues}","Total Collected: ₹${totalCollected}","Total Outstanding: ₹${totalOutstanding}"`);
-  lines.push(`"Settlement Count: ${paidCount} Paid","${pendingCount} Pending","${overdueCount} Overdue"`);
+  lines.push(`"Settlement Breakdown: ${paidCount} Paid","${pendingCount} Pending","${overdueCount} Overdue"`);
   lines.push('');
 
   // Table Headers
   lines.push([
-    '"Billing Month"',
+    '"Fee Type / Category"',
+    '"Billing Month / Description"',
     '"Registration No."',
     '"Student Athlete Name"',
     '"Position"',
     '"Enrollment Status"',
     '"Fee Amount (INR)"',
     '"Payment Status"',
+    '"Receipt Number"',
     '"Settlement Date"',
     '"Payment Channel / Method"',
     '"Parent / Guardian Name"',
-    '"Parent Email"',
     '"Parent Phone"'
   ].join(','));
 
   filteredFees.forEach(f => {
     const s = students.find(st => st.id === f.studentId);
+    const category = (f.feeType === 'Registration' || f.month === 'Registration Fee') ? 'Registration Fee (₹350 One-Time)' : 'Monthly Training Fee (₹150/mo)';
     lines.push([
+      `"${category}"`,
       `"${f.month}"`,
       `"${s?.registrationNumber || 'N/A'}"`,
       `"${(s?.name || 'Unknown Athlete').replace(/"/g, '""')}"`,
@@ -175,11 +189,11 @@ export function downloadFeesReportCSV(students: Student[], fees: FeeStatus[], se
       `"${s?.status || '-'}"`,
       `"${f.amount}"`,
       `"${f.status}"`,
+      `"${f.receiptNumber || (f.status === 'Paid' ? 'KSSB-REC-' + f.id : 'N/A')}"`,
       `"${f.paymentDate || 'Unsettled'}"`,
       `"${f.paymentMethod || 'Awaiting Payment'}"`,
-      `"${(s?.parentName || '-').replace(/"/g, '""')}"`,
-      `"${s?.parentEmail || '-'}"`,
-      `"${s?.parentPhone || '-'}"`
+      `"${(s?.fatherName || s?.parentName || '-').replace(/"/g, '""')}"`,
+      `"${s?.mobileNo || s?.parentPhone || '-'}"`
     ].join(','));
   });
 

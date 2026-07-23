@@ -14,6 +14,7 @@ export interface Student {
   parentEmail: string;
   parentPhone: string;
   registrationDate: string;
+  photoUrl?: string;
   status: 'Active' | 'Inactive';
 }
 
@@ -35,11 +36,13 @@ export interface PerformanceMetric {
 export interface FeeStatus {
   id: string;
   studentId: string;
-  month: string; // e.g. "July 2026"
+  feeType?: 'Registration' | 'Monthly';
+  month: string; // e.g. "Registration Fee" or "July 2026"
   amount: number;
   status: 'Paid' | 'Pending' | 'Overdue';
   paymentDate?: string;
   paymentMethod?: string;
+  receiptNumber?: string;
 }
 
 export interface Tournament {
@@ -51,8 +54,30 @@ export interface Tournament {
   ageGroup: string;
   departureTime: string;
   status: 'Scheduled' | 'Completed' | 'Cancelled';
-  selectedSquad?: string[]; // student IDs selected for matchday squad
-  startingEleven?: string[]; // student IDs in starting XI
+  selectedSquad?: string[]; // Legacy / student IDs
+  startingEleven?: string[]; // Legacy starting XI
+  proposedSquadByCoach?: {
+    startingEleven: string[];
+    substitutes: string[];
+    notes?: string;
+    nominatedAt?: string;
+  };
+  publishedSquadByAdmin?: {
+    startingEleven: string[];
+    substitutes: string[];
+    publishedAt?: string;
+  };
+  isPublishedByAdmin?: boolean;
+}
+
+export interface GalleryImage {
+  id: string;
+  title: string;
+  category: 'Matches' | 'Training' | 'Events' | 'Celebrations' | 'Awards';
+  imageUrl: string;
+  date: string;
+  uploadedBy: string;
+  caption?: string;
 }
 
 export interface InjuryReport {
@@ -89,4 +114,32 @@ export interface CoachEvaluation {
   avgAttendance: number;
   overallRating: number;
   aiReport?: string;
+}
+
+export interface CampJersey {
+  id: string;
+  name: string;
+  description: string;
+  imageUrl: string;
+  price: number;
+  availableSizes: string[]; // ['6yrs', '8yrs', '10yrs', '12yrs', '14yrs', '15yrs', '16yrs']
+  isAvailable: boolean;
+  createdAt: string;
+}
+
+export interface JerseyOrder {
+  id: string;
+  studentId: string;
+  studentName: string;
+  registrationNumber: string;
+  jerseyId: string;
+  jerseyName: string;
+  jerseyImageUrl?: string;
+  size: '6yrs' | '8yrs' | '10yrs' | '12yrs' | '14yrs' | '15yrs' | '16yrs' | string;
+  price: number;
+  orderDate: string;
+  status: 'Pending' | 'Confirmed' | 'Delivered' | 'Cancelled';
+  paymentStatus: 'Pending' | 'Paid';
+  mobileNo?: string;
+  notes?: string;
 }

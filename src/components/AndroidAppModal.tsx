@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Smartphone, Download, CheckCircle2, Share2, Sparkles, X, QrCode, ShieldCheck, ArrowRight } from 'lucide-react';
-import kssbFcLogo from '../assets/images/kssb_fc_logo_1784404534667.jpg';
+import kssbFcLogo from '../assets/images/kssb_fc_official_logo_1784715023480.jpg';
 
 interface AndroidAppModalProps {
   isOpen: boolean;

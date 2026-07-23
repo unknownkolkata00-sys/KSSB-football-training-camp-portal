@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Tournament, Student } from '../types';
-import { Trophy, Calendar, MapPin, Clock, Plus, Check, X, Sparkles, Users, UserCheck, Shield, Star } from 'lucide-react';
+import { Tournament, Student, PerformanceMetric } from '../types';
+import { Trophy, Calendar, MapPin, Clock, Plus, Check, X, Sparkles, Users, UserCheck, Shield, Star, Send, Lock, ChevronDown, Award } from 'lucide-react';
 
 interface TournamentSchedulerProps {
   tournaments: Tournament[];
   students: Student[];
+  metrics?: PerformanceMetric[];
   userRole?: 'admin' | 'coach' | 'student';
   loggedInStudentId?: string;
   onAddTournament: (tournament: Omit<Tournament, 'id'>) => void;
@@ -14,6 +15,7 @@ interface TournamentSchedulerProps {
 export default function TournamentScheduler({
   tournaments,
   students,
+  metrics = [],
   userRole = 'admin',
   loggedInStudentId = '',
   onAddTournament,
@@ -30,11 +32,26 @@ export default function TournamentScheduler({
   const [ageGroup, setAgeGroup] = useState('Under 16');
   const [departureTime, setDepartureTime] = useState('08:00 AM');
 
-  // Squad Selection Modal State
-  const [tempSquad, setTempSquad] = useState<string[]>([]);
-  const [tempXI, setTempXI] = useState<string[]>([]);
+  // Squad Selection State (Coach nomination or Admin publication)
+  const [startingXI, setStartingXI] = useState<string[]>(Array(11).fill(''));
+  const [substitutes, setSubstitutes] = useState<string[]>([]);
+  const [coachNotes, setCoachNotes] = useState('');
 
   const [alert, setAlert] = useState<string | null>(null);
+
+  // Calculate quick stats per student for performance-based selection
+  const getStudentPerformanceSummary = (studentId: string) => {
+    const studentMetrics = metrics.filter(m => m.studentId === studentId);
+    if (studentMetrics.length === 0) {
+      return { attendanceRate: 100, avgStamina: 7, bestSpeed: null };
+    }
+    const present = studentMetrics.filter(m => m.attendance === 'Present').length;
+    const rate = Math.round((present / studentMetrics.length) * 100);
+    const speeds = studentMetrics.map(m => m.speed).filter(s => s > 0);
+    const bestSpeed = speeds.length > 0 ? Math.min(...speeds) : null;
+    const avgStamina = Math.round(studentMetrics.reduce((acc, m) => acc + (m.stamina || 7), 0) / studentMetrics.length);
+    return { attendanceRate: rate, avgStamina, bestSpeed };
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,44 +92,79 @@ export default function TournamentScheduler({
 
   const openSquadModal = (t: Tournament) => {
     setSelectedMatchForSquad(t);
-    setTempSquad(t.selectedSquad || []);
-    setTempXI(t.startingEleven || []);
-  };
-
-  const toggleSquadMember = (studentId: string) => {
-    if (tempSquad.includes(studentId)) {
-      setTempSquad(tempSquad.filter(id => id !== studentId));
-      setTempXI(tempXI.filter(id => id !== studentId));
+    if (userRole === 'coach' && t.proposedSquadByCoach) {
+      // Fill from coach proposed
+      const xi = [...t.proposedSquadByCoach.startingEleven];
+      while (xi.length < 11) xi.push('');
+      setStartingXI(xi);
+      setSubstitutes(t.proposedSquadByCoach.substitutes || []);
+      setCoachNotes(t.proposedSquadByCoach.notes || '');
+    } else if (t.publishedSquadByAdmin) {
+      const xi = [...t.publishedSquadByAdmin.startingEleven];
+      while (xi.length < 11) xi.push('');
+      setStartingXI(xi);
+      setSubstitutes(t.publishedSquadByAdmin.substitutes || []);
+      setCoachNotes('');
     } else {
-      setTempSquad([...tempSquad, studentId]);
+      // Defaults
+      const xi = students.slice(0, 11).map(s => s.id);
+      while (xi.length < 11) xi.push('');
+      setStartingXI(xi);
+      setSubstitutes(students.slice(11).map(s => s.id));
+      setCoachNotes('');
     }
   };
 
-  const toggleStartingXIMember = (studentId: string) => {
-    if (!tempSquad.includes(studentId)) {
-      // Auto-add to squad if selected for starting XI
-      setTempSquad([...tempSquad, studentId]);
-      setTempXI([...tempXI, studentId]);
-      return;
-    }
+  const handleStartingXIDropdownChange = (index: number, studentId: string) => {
+    const updated = [...startingXI];
+    updated[index] = studentId;
+    setStartingXI(updated);
+  };
 
-    if (tempXI.includes(studentId)) {
-      setTempXI(tempXI.filter(id => id !== studentId));
+  const toggleSubstitute = (studentId: string) => {
+    if (substitutes.includes(studentId)) {
+      setSubstitutes(substitutes.filter(id => id !== studentId));
     } else {
-      setTempXI([...tempXI, studentId]);
+      setSubstitutes([...substitutes, studentId]);
     }
   };
 
-  const handleSaveTeamSelection = () => {
+  const handleSaveCoachNomination = () => {
     if (!selectedMatchForSquad) return;
-    onUpdateTournament({
+    const cleanXI = startingXI.filter(id => id !== '');
+    const updated: Tournament = {
       ...selectedMatchForSquad,
-      selectedSquad: tempSquad,
-      startingEleven: tempXI
-    });
-    setAlert(`Team selection updated for ${selectedMatchForSquad.title}! (${tempSquad.length} in Squad, ${tempXI.length} in Starting XI)`);
+      proposedSquadByCoach: {
+        startingEleven: cleanXI,
+        substitutes,
+        notes: coachNotes,
+        nominatedAt: new Date().toISOString()
+      }
+    };
+    onUpdateTournament(updated);
+    setAlert(`Coach Team Selection proposed to Admin for ${selectedMatchForSquad.title}! (${cleanXI.length} Starting XI, ${substitutes.length} Substitutes)`);
     setSelectedMatchForSquad(null);
-    setTimeout(() => setAlert(null), 4000);
+    setTimeout(() => setAlert(null), 5000);
+  };
+
+  const handlePublishAdminFinal = () => {
+    if (!selectedMatchForSquad) return;
+    const cleanXI = startingXI.filter(id => id !== '');
+    const updated: Tournament = {
+      ...selectedMatchForSquad,
+      publishedSquadByAdmin: {
+        startingEleven: cleanXI,
+        substitutes,
+        publishedAt: new Date().toISOString()
+      },
+      isPublishedByAdmin: true,
+      startingEleven: cleanXI,
+      selectedSquad: [...cleanXI, ...substitutes]
+    };
+    onUpdateTournament(updated);
+    setAlert(`FINAL MATCHDAY SQUAD PUBLISHED BY ADMIN for ${selectedMatchForSquad.title}! Displaying live to Coach and Students.`);
+    setSelectedMatchForSquad(null);
+    setTimeout(() => setAlert(null), 5000);
   };
 
   // Sort upcoming tournaments
@@ -127,87 +179,89 @@ export default function TournamentScheduler({
       
       {/* Alert Banner */}
       {alert && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm font-semibold flex items-center justify-between shadow-sm">
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2">
             <Check size={18} className="text-emerald-600 shrink-0" />
-            {alert}
+            <span>{alert}</span>
           </div>
           <button onClick={() => setAlert(null)} className="text-gray-400 hover:text-gray-600 font-bold cursor-pointer">Dismiss</button>
         </div>
       )}
 
       {/* Header Controls */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4" id="scheduler-header">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4" id="scheduler-header">
         <div className="space-y-1">
-          <h2 className="text-2xl font-bold text-gray-900 font-sans">Upcoming Matches & Team Selection</h2>
-          <p className="text-sm text-gray-500">
-            {userRole === 'student' 
-              ? 'Check upcoming match logistics and view your team selection status.' 
-              : 'Schedule fixtures, manage departure times, and select starting lineups for KSSB FC.'}
+          <h2 className="text-xl sm:text-2xl font-black text-gray-900 font-sans tracking-tight">Match Fixtures & Performance-Based Team Selection</h2>
+          <p className="text-xs sm:text-sm text-gray-500">
+            {userRole === 'coach' 
+              ? 'Select starting XI from dropdowns based on player performance metrics and submit proposed team list to Admin.'
+              : userRole === 'admin'
+              ? 'Review coach team selections and publish the official matchday squad for players and coaches.'
+              : 'Check upcoming match details and view published matchday team lineups.'}
           </p>
         </div>
         
-        {userRole !== 'student' && (
+        {userRole === 'admin' && (
           <button
             onClick={() => setShowAddForm(true)}
-            className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-sm rounded-xl flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+            className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-sm transition-all cursor-pointer shrink-0"
             id="add-fixture-btn"
           >
-            <Plus size={18} />
-            Schedule Match
+            <Plus size={16} />
+            Schedule New Match
           </button>
         )}
       </div>
 
       {/* Add Match Modal */}
-      {showAddForm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all" id="add-fixture-modal">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-xl relative max-h-[90vh] overflow-y-auto">
+      {showAddForm && userRole === 'admin' && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all" id="add-fixture-modal">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <button 
               onClick={() => setShowAddForm(false)}
-              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-50 cursor-pointer"
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"
             >
               <X size={20} />
             </button>
             <div className="space-y-1">
-              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <span className="text-[10px] font-mono font-bold text-emerald-800 uppercase tracking-widest block">Admin Schedule</span>
+              <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
                 <Sparkles size={20} className="text-emerald-600" />
                 Schedule Match Fixture
               </h3>
-              <p className="text-xs text-gray-500">Insert team match logistics. This will broadcast to player schedules instantly.</p>
             </div>
             
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono font-bold text-gray-700 uppercase">Tournament / Event Title</label>
+              <div className="space-y-1">
+                <label className="text-xs font-mono font-bold text-gray-700 uppercase">Tournament / Event Title *</label>
                 <input 
                   type="text" 
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Kolkata Youth League Knockout"
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-700"
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono font-bold text-gray-700 uppercase">Opponent Academy</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-mono font-bold text-gray-700 uppercase">Opponent Academy *</label>
                   <input 
                     type="text" 
                     value={opponent}
                     onChange={(e) => setOpponent(e.target.value)}
-                    placeholder="e.g. East Bengal Youth Academy"
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                    placeholder="e.g. East Bengal Youth FC"
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none"
                     required
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-xs font-mono font-bold text-gray-700 uppercase">Age Group / Division</label>
                   <select 
                     value={ageGroup}
                     onChange={(e) => setAgeGroup(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm bg-white"
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold bg-white"
                   >
                     <option value="Under 12">Under 12 Division</option>
                     <option value="Under 14">Under 14 Division</option>
@@ -216,37 +270,37 @@ export default function TournamentScheduler({
                   </select>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono font-bold text-gray-700 uppercase">Event Date</label>
+                <div className="space-y-1">
+                  <label className="text-xs font-mono font-bold text-gray-700 uppercase">Event Date *</label>
                   <input 
                     type="date" 
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none"
                     required
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono font-bold text-gray-700 uppercase">Departure / Meeting Time</label>
+                <div className="space-y-1">
+                  <label className="text-xs font-mono font-bold text-gray-700 uppercase">Departure Time *</label>
                   <input 
                     type="text" 
                     value={departureTime}
                     onChange={(e) => setDepartureTime(e.target.value)}
                     placeholder="e.g. 08:30 AM"
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none"
                     required
                   />
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono font-bold text-gray-700 uppercase">Turf / Arena Location</label>
+              <div className="space-y-1">
+                <label className="text-xs font-mono font-bold text-gray-700 uppercase">Turf / Stadium Location *</label>
                 <input 
                   type="text" 
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Kadamtala Stadium Grounds, Field A"
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                  placeholder="e.g. Kadamtala Stadium Grounds, Field A"
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none"
                   required
                 />
               </div>
@@ -255,13 +309,13 @@ export default function TournamentScheduler({
                 <button 
                   type="button"
                   onClick={() => setShowAddForm(false)}
-                  className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold hover:bg-gray-50 cursor-pointer"
+                  className="px-4 py-2 border border-gray-200 rounded-xl text-xs font-bold hover:bg-gray-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit"
-                  className="px-5 py-2 bg-emerald-700 text-white rounded-lg text-sm font-semibold hover:bg-emerald-800 cursor-pointer"
+                  className="px-5 py-2 bg-emerald-700 text-white rounded-xl text-xs font-bold hover:bg-emerald-800 cursor-pointer shadow-sm"
                 >
                   Schedule Match
                 </button>
@@ -271,172 +325,253 @@ export default function TournamentScheduler({
         </div>
       )}
 
-      {/* Team Selection Management Modal (Admin/Coach) */}
-      {selectedMatchForSquad && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+      {/* Team Selection Dropdown Selector Modal (Coach / Admin) */}
+      {selectedMatchForSquad && (userRole === 'admin' || userRole === 'coach') && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-3xl w-full p-4 sm:p-6 space-y-6 shadow-2xl relative my-6 max-h-[90vh] overflow-y-auto border border-emerald-100">
             <button 
               onClick={() => setSelectedMatchForSquad(null)}
-              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-50 cursor-pointer"
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 cursor-pointer z-10"
             >
               <X size={20} />
             </button>
 
             <div className="space-y-1">
-              <span className="text-xs font-mono font-bold text-emerald-700 uppercase tracking-wider block">Matchday Team Selection</span>
-              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <Users size={22} className="text-emerald-700" />
+              <span className="text-[10px] font-mono font-bold text-emerald-800 uppercase tracking-widest block">
+                {userRole === 'coach' ? 'Coach Team Selection (Performance-based)' : 'Admin Review & Squad Publication'}
+              </span>
+              <h3 className="text-lg sm:text-xl font-black text-gray-900 flex items-center gap-2">
+                <Trophy size={20} className="text-emerald-700 shrink-0" />
                 {selectedMatchForSquad.title} vs {selectedMatchForSquad.opponent}
               </h3>
               <p className="text-xs text-gray-500">
-                Select athletes for the <strong>Match Squad</strong> and pick the <strong>Starting XI</strong> lineup.
+                Select starting players using performance metric indicators (Sprint speed, Stamina, Attendance rate).
               </p>
             </div>
 
-            <div className="flex items-center gap-4 bg-emerald-50 border border-emerald-100 p-3 rounded-xl text-xs text-emerald-900 font-semibold">
-              <div className="flex items-center gap-1.5">
-                <Users size={16} className="text-emerald-700" />
-                <span>Squad Selected: <strong>{tempSquad.length} Players</strong></span>
+            {/* Coach Proposal Alert if Admin is reviewing */}
+            {userRole === 'admin' && selectedMatchForSquad.proposedSquadByCoach && (
+              <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <Star size={14} className="text-amber-600 shrink-0" />
+                  Coach Abedemi's Proposed Squad (Submitted {selectedMatchForSquad.proposedSquadByCoach.nominatedAt?.slice(0, 10)})
+                </div>
+                {selectedMatchForSquad.proposedSquadByCoach.notes && (
+                  <p className="italic text-gray-700">"{selectedMatchForSquad.proposedSquadByCoach.notes}"</p>
+                )}
               </div>
-              <div className="flex items-center gap-1.5">
-                <Star size={16} className="text-amber-500" />
-                <span>Starting XI: <strong>{tempXI.length} Players</strong></span>
-              </div>
-            </div>
+            )}
 
-            {/* Roster Selection Table */}
-            <div className="border border-gray-200 rounded-xl overflow-hidden">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-mono uppercase">
-                  <tr>
-                    <th className="p-3">Player Name</th>
-                    <th className="p-3">Position</th>
-                    <th className="p-3 text-center">In Match Squad</th>
-                    <th className="p-3 text-center">Starting XI</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 font-medium">
-                  {students.map(s => {
-                    const inSquad = tempSquad.includes(s.id);
-                    const inXI = tempXI.includes(s.id);
-                    return (
-                      <tr key={s.id} className={`hover:bg-gray-50/60 transition-colors ${inXI ? 'bg-amber-50/30' : inSquad ? 'bg-emerald-50/20' : ''}`}>
-                        <td className="p-3">
-                          <div className="font-bold text-gray-900">{s.name}</div>
-                          <div className="text-[11px] text-gray-500">Age: {s.age}</div>
-                        </td>
-                        <td className="p-3">
-                          <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-mono text-[10px] font-bold">
-                            {s.position}
+            {/* Starting XI Dropdown Grid */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                <h4 className="font-bold text-sm text-gray-900 flex items-center gap-1.5">
+                  <Star size={16} className="text-amber-500 fill-amber-400" />
+                  Starting XI Lineup (Select from Dropdown)
+                </h4>
+                <span className="text-[11px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded">
+                  {startingXI.filter(id => id !== '').length} / 11 Selected
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {Array.from({ length: 11 }).map((_, idx) => {
+                  const currentSelectedId = startingXI[idx] || '';
+                  const currentPerf = currentSelectedId ? getStudentPerformanceSummary(currentSelectedId) : null;
+
+                  return (
+                    <div key={idx} className="p-3 bg-gray-50/80 border border-gray-200 rounded-2xl space-y-1.5">
+                      <div className="flex justify-between items-center text-[11px] font-mono font-bold text-gray-600">
+                        <span>Position #{idx + 1}</span>
+                        {currentPerf && (
+                          <span className="text-emerald-700 font-bold">
+                            Att: {currentPerf.attendanceRate}% | Stamina: {currentPerf.avgStamina}/10
                           </span>
-                        </td>
-                        <td className="p-3 text-center">
-                          <input 
-                            type="checkbox"
-                            checked={inSquad}
-                            onChange={() => toggleSquadMember(s.id)}
-                            className="h-4 w-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500 cursor-pointer"
-                          />
-                        </td>
-                        <td className="p-3 text-center">
-                          <input 
-                            type="checkbox"
-                            checked={inXI}
-                            onChange={() => toggleStartingXIMember(s.id)}
-                            className="h-4 w-4 text-amber-500 rounded border-gray-300 focus:ring-amber-500 cursor-pointer"
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        )}
+                      </div>
+
+                      <select
+                        value={currentSelectedId}
+                        onChange={(e) => handleStartingXIDropdownChange(idx, e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-emerald-600/20"
+                      >
+                        <option value="">-- Select Player for Position #{idx + 1} --</option>
+                        {students.map(s => {
+                          const perf = getStudentPerformanceSummary(s.id);
+                          return (
+                            <option key={s.id} value={s.id}>
+                              {s.name} ({s.position}) - Speed: {perf.bestSpeed ? `${perf.bestSpeed}s` : 'N/A'}, Att: {perf.attendanceRate}%
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
-              <button 
+            {/* Substitutes Multi-Check */}
+            <div className="space-y-3 pt-2">
+              <h4 className="font-bold text-sm text-gray-900 flex items-center gap-1.5">
+                <Users size={16} className="text-emerald-700" />
+                Select Substitutes / Reserve Squad ({substitutes.length})
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border border-gray-200 rounded-2xl bg-gray-50/50">
+                {students.map(s => {
+                  const isSelectedInXI = startingXI.includes(s.id);
+                  const isSub = substitutes.includes(s.id);
+                  const perf = getStudentPerformanceSummary(s.id);
+
+                  if (isSelectedInXI) return null; // Already in starting XI
+
+                  return (
+                    <label
+                      key={s.id}
+                      className={`p-2.5 rounded-xl border text-xs font-medium flex items-center justify-between cursor-pointer transition-all ${
+                        isSub ? 'bg-emerald-100/70 border-emerald-300 text-emerald-950 font-bold' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={isSub}
+                          onChange={() => toggleSubstitute(s.id)}
+                          className="h-4 w-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500 cursor-pointer"
+                        />
+                        <div>
+                          <div className="font-bold">{s.name}</div>
+                          <div className="text-[10px] text-gray-500 font-mono">{s.position} • Att: {perf.attendanceRate}%</div>
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Coach Notes */}
+            {userRole === 'coach' && (
+              <div className="space-y-1">
+                <label className="text-xs font-mono font-bold text-gray-700 uppercase">Tactical Notes for Admin</label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Selected Rahul as Forward due to exceptional sprint times this week..."
+                  value={coachNotes}
+                  onChange={(e) => setCoachNotes(e.target.value)}
+                  className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none"
+                />
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-2.5 justify-end pt-4 border-t border-gray-100">
+              <button
+                type="button"
                 onClick={() => setSelectedMatchForSquad(null)}
-                className="px-4 py-2 border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 cursor-pointer"
+                className="px-4 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer text-center"
               >
                 Cancel
               </button>
-              <button 
-                onClick={handleSaveTeamSelection}
-                className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm cursor-pointer"
-              >
-                <Check size={16} />
-                Save Match Selection
-              </button>
+
+              {userRole === 'coach' && (
+                <button
+                  type="button"
+                  onClick={handleSaveCoachNomination}
+                  className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Send size={15} /> Propose Team to Admin
+                </button>
+              )}
+
+              {userRole === 'admin' && (
+                <button
+                  type="button"
+                  onClick={handlePublishAdminFinal}
+                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black shadow-md cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Shield size={15} /> Publish Final Official Squad
+                </button>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Match Ticket Layout Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="tournament-fixtures-grid">
+      {/* Match Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="tournament-fixtures-grid">
         {sortedTournaments.length > 0 ? (
           sortedTournaments.map(t => {
-            const squadIds = t.selectedSquad || [];
-            const xiIds = t.startingEleven || [];
-            const isStudentInSquad = loggedInStudentId ? squadIds.includes(loggedInStudentId) : false;
-            const isStudentInXI = loggedInStudentId ? xiIds.includes(loggedInStudentId) : false;
+            const isPublished = t.isPublishedByAdmin;
+            const publishedXI = t.publishedSquadByAdmin?.startingEleven || t.startingEleven || [];
+            const publishedSubs = t.publishedSquadByAdmin?.substitutes || t.selectedSquad || [];
+            const proposedXI = t.proposedSquadByCoach?.startingEleven || [];
+
+            const isStudentInXI = loggedInStudentId ? publishedXI.includes(loggedInStudentId) : false;
+            const isStudentInSub = loggedInStudentId ? publishedSubs.includes(loggedInStudentId) : false;
 
             return (
               <div 
                 key={t.id} 
-                className={`p-5 bg-white border rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4 ${
-                  t.status === 'Completed' ? 'border-gray-100 bg-gray-50/20' :
-                  t.status === 'Cancelled' ? 'border-red-100 bg-red-50/10' :
-                  'border-emerald-100 bg-emerald-50/10'
-                }`}
+                className="p-5 bg-white border border-gray-200/80 rounded-3xl shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4"
                 id={`tournament-card-${t.id}`}
               >
                 <div className="space-y-3">
-                  {/* Age group tag and status indicator */}
-                  <div className="flex justify-between items-center">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
-                      t.status === 'Completed' ? 'bg-gray-100 text-gray-700' :
-                      t.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
-                      'bg-emerald-100 text-emerald-800'
-                    }`}>
+                  {/* Status Badges */}
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-800 text-[10px] font-mono font-bold uppercase rounded-lg border border-emerald-200/60">
                       {t.ageGroup}
                     </span>
                     
-                    <span className={`h-2.5 w-2.5 rounded-full inline-block ${
-                      t.status === 'Completed' ? 'bg-gray-400' :
-                      t.status === 'Cancelled' ? 'bg-red-500 animate-pulse' :
-                      'bg-emerald-500 animate-pulse'
-                    }`} title={`Status: ${t.status}`} />
+                    {isPublished ? (
+                      <span className="px-2 py-0.5 bg-amber-500/10 text-amber-900 border border-amber-300 text-[10px] font-mono font-bold uppercase rounded-lg flex items-center gap-1">
+                        <Shield size={10} className="text-amber-600" /> Published
+                      </span>
+                    ) : t.proposedSquadByCoach ? (
+                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-200 text-[10px] font-mono font-bold uppercase rounded-lg flex items-center gap-1">
+                        <Clock size={10} className="text-indigo-600" /> Coach Proposed
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-mono font-bold uppercase rounded-lg">
+                        Pending Selection
+                      </span>
+                    )}
                   </div>
 
-                  {/* Student Selection Banner if in Student Mode */}
+                  {/* Student View Banner */}
                   {userRole === 'student' && loggedInStudentId && (
                     <div className="pt-1">
-                      {isStudentInXI ? (
-                        <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-900 rounded-xl text-xs font-bold flex items-center gap-2">
-                          <Star size={16} className="text-amber-600 shrink-0 fill-amber-500" />
-                          <span>Selected in Starting XI ⚽!</span>
-                        </div>
-                      ) : isStudentInSquad ? (
-                        <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-900 rounded-xl text-xs font-bold flex items-center gap-2">
-                          <UserCheck size={16} className="text-emerald-600 shrink-0" />
-                          <span>Selected in Matchday Squad 🏃</span>
-                        </div>
+                      {isPublished ? (
+                        isStudentInXI ? (
+                          <div className="p-2.5 bg-amber-500/15 border border-amber-400 text-amber-950 rounded-2xl text-xs font-bold flex items-center gap-2">
+                            <Star size={16} className="text-amber-600 shrink-0 fill-amber-400" />
+                            <span>You are in the Starting XI Lineup! ⚽</span>
+                          </div>
+                        ) : isStudentInSub ? (
+                          <div className="p-2.5 bg-emerald-500/15 border border-emerald-400 text-emerald-950 rounded-2xl text-xs font-bold flex items-center gap-2">
+                            <UserCheck size={16} className="text-emerald-700 shrink-0" />
+                            <span>You are in the Matchday Substitutes 🏃</span>
+                          </div>
+                        ) : (
+                          <div className="p-2.5 bg-gray-100 text-gray-600 rounded-2xl text-xs font-medium">
+                            Standby / Training Reserve
+                          </div>
+                        )
                       ) : (
-                        <div className="p-2.5 bg-gray-100 text-gray-600 rounded-xl text-xs font-medium">
-                          Standby / Training Reserve
+                        <div className="p-2.5 bg-slate-100 text-slate-600 rounded-2xl text-xs font-medium flex items-center gap-1.5">
+                          <Clock size={14} /> Team selection pending Admin publication
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* Match title */}
-                  <h4 className="font-bold text-gray-900 text-base leading-snug">{t.title}</h4>
+                  {/* Match Details */}
+                  <h4 className="font-black text-gray-900 text-base leading-snug">{t.title}</h4>
                   
-                  {/* Logistics */}
                   <div className="space-y-1.5 text-xs text-gray-600">
                     <div className="flex items-center gap-2">
-                      <Trophy size={14} className="text-gray-400 shrink-0" />
+                      <Trophy size={14} className="text-emerald-700 shrink-0" />
                       <span>Opponent: <strong className="text-gray-950">vs {t.opponent}</strong></span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -445,66 +580,57 @@ export default function TournamentScheduler({
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock size={14} className="text-gray-400 shrink-0" />
-                      <span>Meeting Time: <strong className="text-gray-800">{t.departureTime}</strong></span>
+                      <span>Departure: <strong className="text-gray-800">{t.departureTime}</strong></span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <MapPin size={14} className="text-gray-400 shrink-0 text-rose-500" />
-                      <span className="truncate" title={t.location}>Location: <strong>{t.location}</strong></span>
+                      <MapPin size={14} className="text-rose-500 shrink-0" />
+                      <span className="break-words">Ground: <strong>{t.location}</strong></span>
                     </div>
                   </div>
 
-                  {/* Team Selection Summary Pill */}
-                  <div className="p-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs space-y-1">
-                    <div className="flex justify-between items-center text-[11px] font-mono text-gray-600">
-                      <span>Squad: <strong>{squadIds.length} Athletes</strong></span>
-                      <span>Starting XI: <strong>{xiIds.length} Athletes</strong></span>
-                    </div>
-                    {xiIds.length > 0 && (
-                      <div className="text-[11px] text-gray-500 truncate" title={students.filter(s => xiIds.includes(s.id)).map(s => s.name).join(', ')}>
-                        <strong className="text-emerald-800 font-semibold">Lineup: </strong>
-                        {students.filter(s => xiIds.includes(s.id)).map(s => s.name).join(', ')}
+                  {/* Published Squad Preview */}
+                  {isPublished && publishedXI.length > 0 && (
+                    <div className="p-3 bg-amber-50/50 border border-amber-200/70 rounded-2xl text-xs space-y-1.5">
+                      <div className="flex justify-between items-center text-[11px] font-mono font-bold text-amber-900">
+                        <span>Official Lineup Published</span>
+                        <span>{publishedXI.length} Starting XI</span>
                       </div>
-                    )}
-                  </div>
+                      <p className="text-[11px] text-gray-700 font-medium line-clamp-2">
+                        {students.filter(s => publishedXI.includes(s.id)).map(s => s.name).join(', ')}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
-                {/* Status Update & Team Selection Trigger for Admin / Coach */}
+                {/* Team Selection Action for Coach / Admin */}
                 {userRole !== 'student' && (
-                  <div className="pt-3 border-t border-gray-100 flex flex-col gap-2">
+                  <div className="pt-3 border-t border-gray-100 space-y-2">
                     <button 
                       onClick={() => openSquadModal(t)}
-                      className="w-full py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
                     >
-                      <Users size={14} />
-                      Team Selection & Lineup ({squadIds.length})
+                      <Users size={15} />
+                      {userRole === 'coach' ? 'Propose Team Selection' : 'Review & Publish Final Squad'}
                     </button>
 
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span className="text-[10px] font-mono font-semibold text-gray-500 uppercase">Match Status:</span>
-                      <div className="flex bg-gray-50 p-0.5 rounded border border-gray-200">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-mono text-gray-500 uppercase font-bold">Status:</span>
+                      <div className="flex gap-1">
                         <button 
                           onClick={() => handleStatusChange(t, 'Scheduled')}
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
-                            t.status === 'Scheduled' ? 'bg-emerald-600 text-white' : 'text-gray-500 hover:text-gray-800'
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                            t.status === 'Scheduled' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600'
                           }`}
                         >
-                          Active
+                          Scheduled
                         </button>
                         <button 
                           onClick={() => handleStatusChange(t, 'Completed')}
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
-                            t.status === 'Completed' ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-800'
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                            t.status === 'Completed' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-600'
                           }`}
                         >
-                          Done
-                        </button>
-                        <button 
-                          onClick={() => handleStatusChange(t, 'Cancelled')}
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
-                            t.status === 'Cancelled' ? 'bg-rose-600 text-white' : 'text-gray-500 hover:text-gray-800'
-                          }`}
-                        >
-                          Cancel
+                          Completed
                         </button>
                       </div>
                     </div>
@@ -514,8 +640,8 @@ export default function TournamentScheduler({
             );
           })
         ) : (
-          <div className="col-span-full text-center py-10 bg-white border border-gray-100 rounded-2xl text-gray-500">
-            No tournaments scheduled yet.
+          <div className="col-span-full text-center py-12 bg-white border border-gray-200 rounded-3xl text-gray-500">
+            No match fixtures scheduled yet.
           </div>
         )}
       </div>

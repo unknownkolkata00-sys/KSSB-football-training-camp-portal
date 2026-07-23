@@ -1,6 +1,8 @@
 {
   "name": "Football Training Camp Portal",
   "description": "A portal for students to register and track performance metrics, and for coaches to monitor player progress, manage tournament schedules, handle injury reports, and automate parent notifications.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": [
+    "camera"
+  ],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
