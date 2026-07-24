@@ -2,7 +2,7 @@ import React from 'react';
 import { Student, PerformanceMetric, FeeStatus } from '../types';
 import { Users, CreditCard, Activity, CheckCircle, ArrowRight, Download, FileText, CalendarCheck, IndianRupee } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend } from 'recharts';
-import kssbFcLogo from '../assets/images/kssb_fc_official_logo_1784715023480.jpg';
+import kssbFcLogo from '../assets/images/kssb_fc_official_logo.jpg';
 import { downloadAttendanceReportCSV, downloadFeesReportCSV } from '../utils/reports';
 
 interface DashboardOverviewProps {

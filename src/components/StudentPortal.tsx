@@ -6,7 +6,7 @@ import TournamentScheduler from './TournamentScheduler';
 import GalleryView from './GalleryView';
 import PlayerIDCardModal from './PlayerIDCardModal';
 import StudentJerseyStore from './StudentJerseyStore';
-import kssbFcLogo from '../assets/images/kssb_fc_official_logo_1784715023480.jpg';
+import kssbFcLogo from '../assets/images/kssb_fc_official_logo.jpg';
 
 interface StudentPortalProps {
   students: Student[];

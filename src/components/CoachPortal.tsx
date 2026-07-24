@@ -3,7 +3,7 @@ import { Student, PerformanceMetric, FeeStatus, Tournament, GalleryImage } from 
 import { UserCheck, Activity, CreditCard, Lock, CheckCircle2, Clock, Check, Phone, Award, ArrowLeft, Trophy, Camera } from 'lucide-react';
 import TournamentScheduler from './TournamentScheduler';
 import GalleryView from './GalleryView';
-import kssbFcLogo from '../assets/images/kssb_fc_official_logo_1784715023480.jpg';
+import kssbFcLogo from '../assets/images/kssb_fc_official_logo.jpg';
 
 interface CoachPortalProps {
   students: Student[];

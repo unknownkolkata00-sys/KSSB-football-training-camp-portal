@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Student, PerformanceMetric } from '../types';
-import logo from '../assets/images/kssb_fc_official_logo_1784715023480.jpg';
+import logo from '../assets/images/kssb_fc_official_logo.jpg';
 import { UserPlus, FileSpreadsheet, Search, Check, AlertCircle, Sparkles, X, Edit3, Phone, MapPin, User, ShieldCheck, Camera, Trash2, IdCard } from 'lucide-react';
 import PlayerIDCardModal from './PlayerIDCardModal';
 import PassportPhotoCapture from './PassportPhotoCapture';

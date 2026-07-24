@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Student } from '../types';
-import logo from '../assets/images/kssb_fc_official_logo_1784715023480.jpg';
+import logo from '../assets/images/kssb_fc_official_logo.jpg';
 import { Shield, User, Lock, Phone, Trophy, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface LoginProps {

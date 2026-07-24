@@ -40,7 +40,7 @@ import Login from './components/Login';
 import AndroidAppModal from './components/AndroidAppModal';
 import { downloadAttendanceReportCSV, downloadFeesReportCSV } from './utils/reports';
 import { AnimatePresence, motion } from 'motion/react';
-import kssbFcLogo from './assets/images/kssb_fc_official_logo_1784715023480.jpg';
+import kssbFcLogo from './assets/images/kssb_fc_official_logo.jpg';
 import { 
   Users, 
   Activity, 

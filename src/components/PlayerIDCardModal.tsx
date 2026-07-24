@@ -1,6 +1,6 @@
 import React from 'react';
 import { Student } from '../types';
-import logo from '../assets/images/kssb_fc_official_logo_1784715023480.jpg';
+import logo from '../assets/images/kssb_fc_official_logo.jpg';
 import { X, Printer, ShieldCheck, Sparkles, CheckCircle2, QrCode, User } from 'lucide-react';
 
 interface PlayerIDCardModalProps {

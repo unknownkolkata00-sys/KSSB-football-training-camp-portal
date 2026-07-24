@@ -1,6 +1,6 @@
 import React from 'react';
 import { FeeStatus, Student } from '../types';
-import logo from '../assets/images/kssb_fc_official_logo_1784715023480.jpg';
+import logo from '../assets/images/kssb_fc_official_logo.jpg';
 import { X, Printer, CheckCircle2, ShieldCheck, Download, FileText } from 'lucide-react';
 
 interface ReceiptModalProps {
