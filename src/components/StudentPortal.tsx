@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Student, PerformanceMetric, FeeStatus, Tournament, GalleryImage, CampJersey, JerseyOrder } from '../types';
-import { User, Calendar, Award, CreditCard, Trophy, CheckCircle2, AlertCircle, Clock, Star, Users, Phone, Mail, Activity, ArrowUpRight, Zap, Shield, Check, X, ArrowLeft, FileText, Tag, Camera, IdCard, Shirt, ShoppingBag } from 'lucide-react';
+import { User, Calendar, Award, CreditCard, Trophy, CheckCircle2, AlertCircle, Clock, Star, Users, Phone, Mail, Activity, ArrowUpRight, Zap, Shield, Check, X, ArrowLeft, FileText, Tag, Camera, IdCard, Shirt, ShoppingBag, ChevronRight } from 'lucide-react';
 import ReceiptModal from './ReceiptModal';
 import TournamentScheduler from './TournamentScheduler';
 import GalleryView from './GalleryView';
 import PlayerIDCardModal from './PlayerIDCardModal';
 import StudentJerseyStore from './StudentJerseyStore';
 import kssbFcLogo from '../assets/images/kssb_fc_official_logo.jpg';
+import StudentAvatar from './StudentAvatar';
 
 interface StudentPortalProps {
   students: Student[];
@@ -20,6 +21,8 @@ interface StudentPortalProps {
   onSelectStudent: (studentId: string) => void;
   onUpdateFee: (updatedFee: FeeStatus) => void;
   onPlaceOrder?: (order: Omit<JerseyOrder, 'id' | 'orderDate'>) => void;
+  onAddGalleryImage?: (image: Omit<GalleryImage, 'id' | 'date'>) => void;
+  onDeleteGalleryImage?: (id: string) => void;
 }
 
 export default function StudentPortal({
@@ -33,7 +36,9 @@ export default function StudentPortal({
   loggedInStudentId,
   onSelectStudent,
   onUpdateFee,
-  onPlaceOrder
+  onPlaceOrder,
+  onAddGalleryImage,
+  onDeleteGalleryImage
 }: StudentPortalProps) {
   // Fallback to first student if none selected
   const activeStudentId = loggedInStudentId || (students[0]?.id || '');
@@ -139,21 +144,7 @@ export default function StudentPortal({
       <div className="bg-slate-900 border border-slate-800 text-white p-4 sm:p-6 rounded-2xl shadow-lg space-y-4">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
           <div className="flex items-center gap-4">
-            {student.photoUrl ? (
-              <img 
-                src={student.photoUrl} 
-                alt={student.name} 
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-amber-400 object-cover bg-slate-800 shadow-md shrink-0"
-              />
-            ) : (
-              <img 
-                src={kssbFcLogo || '/logo.jpg'} 
-                onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }}
-                alt="KSSB FC Logo" 
-                className="w-14 h-14 rounded-2xl border border-amber-400/40 object-contain bg-white p-1 shadow-md shrink-0"
-                referrerPolicy="no-referrer"
-              />
-            )}
+            <StudentAvatar photoUrl={student.photoUrl} name={student.name} size="xl" className="border-2 border-amber-400 shadow-md" />
             <div>
               <div className="flex items-center gap-2">
                 <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 font-mono text-[10px] font-bold uppercase rounded">
@@ -264,6 +255,36 @@ export default function StudentPortal({
       {activeTab === 'report' && (
         <div className="space-y-6">
           
+          {/* Quick Fee Status Banner - Very Easy Fee Checking */}
+          <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 rounded-2xl text-white shadow-md border border-emerald-800/60 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <CreditCard className="text-amber-400" size={18} />
+                <span className="text-[11px] font-mono font-bold text-amber-300 uppercase tracking-wider">
+                  Quick Fee Status Summary
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-xs">
+                <span className="p-1.5 px-3 bg-slate-800/90 rounded-lg border border-slate-700">
+                  Reg Fee (₹350): <strong className={regFeeRecord.status === 'Paid' ? 'text-emerald-400' : 'text-amber-400'}>{regFeeRecord.status}</strong>
+                </span>
+                <span className="p-1.5 px-3 bg-slate-800/90 rounded-lg border border-slate-700">
+                  Monthly Dues: <strong className={totalOutstanding > 0 ? 'text-rose-400' : 'text-emerald-400'}>₹{totalOutstanding}</strong>
+                </span>
+                <span className="p-1.5 px-3 bg-slate-800/90 rounded-lg border border-slate-700">
+                  Total Settled: <strong className="text-emerald-400">₹{totalAmountPaid}</strong>
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setActiveTab('fees')}
+              className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold rounded-xl text-xs flex items-center gap-2 shadow-md transition-all cursor-pointer shrink-0"
+            >
+              <CreditCard size={15} /> Check Complete Fee Ledger & Digital Receipts <ChevronRight size={15} />
+            </button>
+          </div>
+
           {/* Top Performance Key Indicators */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-5 bg-white border border-gray-100 rounded-2xl shadow-sm space-y-1">
@@ -412,7 +433,7 @@ export default function StudentPortal({
               </div>
               <h4 className="text-xl font-black text-white">Registration Fee Status: {regFeeRecord.status}</h4>
               <div className="text-xs text-slate-300 font-mono space-x-3">
-                <span>Paid Date: <strong>{regFeeRecord.paymentDate || 'Pending Settlement'}</strong></span>
+                <span>Paid Date: <strong>{regFeeRecord.paymentDate || 'Pending Admin Settlement'}</strong></span>
                 <span>Receipt Number: <strong>{regFeeRecord.receiptNumber || 'N/A'}</strong></span>
               </div>
             </div>
@@ -425,12 +446,9 @@ export default function StudentPortal({
                 <FileText size={15} /> View Registration Receipt
               </button>
             ) : (
-              <button 
-                onClick={() => setPayingFee(regFeeRecord)}
-                className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-2 shadow-sm transition-all cursor-pointer shrink-0"
-              >
-                <CreditCard size={15} /> Pay Registration Fee (₹350)
-              </button>
+              <div className="px-4 py-2.5 bg-amber-500/20 text-amber-300 rounded-xl text-xs font-bold border border-amber-500/30 flex items-center gap-2 shrink-0">
+                <Clock size={16} /> Pending Admin Settlement
+              </div>
             )}
           </div>
 
@@ -441,7 +459,7 @@ export default function StudentPortal({
                 Personal Tuition & Fee History
               </h3>
               <p className="text-xs text-gray-500">
-                Registration Fee = ₹350 (One Time Only) | Monthly Training Fee = ₹150 per month.
+                Registration Fee = ₹350 (One Time) | Monthly Training Fee = ₹150 per month. Fees are settled exclusively by Club Admin.
               </p>
             </div>
 
@@ -466,7 +484,7 @@ export default function StudentPortal({
                   <th className="p-3">Payment Status</th>
                   <th className="p-3">Receipt Number</th>
                   <th className="p-3">Payment Date</th>
-                  <th className="p-3 text-right">Receipt / Action</th>
+                  <th className="p-3 text-right">Receipt / Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-medium">
@@ -504,12 +522,9 @@ export default function StudentPortal({
                             <FileText size={13} /> View Receipt
                           </button>
                         ) : (
-                          <button
-                            onClick={() => setPayingFee(f)}
-                            className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold shadow-sm cursor-pointer transition-all inline-flex items-center gap-1"
-                          >
-                            <CreditCard size={13} /> Pay Dues (₹{f.amount})
-                          </button>
+                          <span className="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg text-[11px] font-bold inline-flex items-center gap-1">
+                            <Clock size={12} /> Pending Admin Settlement
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -518,58 +533,20 @@ export default function StudentPortal({
               </tbody>
             </table>
           </div>
-
-          {/* Online Payment Modal */}
-          {payingFee && (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl relative border border-emerald-100">
-                <button onClick={() => setPayingFee(null)} className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 p-1 rounded-full">
-                  <X size={20} />
-                </button>
-
-                <div className="space-y-1">
-                  <span className="text-xs font-mono font-bold text-emerald-700 uppercase">Online Settlement Portal</span>
-                  <h4 className="text-lg font-bold text-gray-900">Settle Dues for {payingFee.month}</h4>
-                  <p className="text-xs text-gray-500">KSSB FC Digital Tuition & Admission Billing</p>
-                </div>
-
-                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Athlete Name:</span>
-                    <strong className="text-gray-900">{student.name}</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Fee Category:</span>
-                    <strong className="text-gray-900">{payingFee.month}</strong>
-                  </div>
-                  <div className="flex justify-between text-sm font-bold border-t border-gray-200 pt-2 text-emerald-900">
-                    <span>Total Amount Due:</span>
-                    <span className="font-mono text-base">₹{payingFee.amount}.00</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-mono font-bold text-gray-700 uppercase">Payment Method</label>
-                  <select className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold bg-white">
-                    <option value="UPI">UPI (Google Pay / PhonePe / Paytm)</option>
-                    <option value="Card">Debit / Credit Card</option>
-                    <option value="NetBanking">Net Banking</option>
-                  </select>
-                </div>
-
-                <button
-                  onClick={handleSettleFee}
-                  className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <CheckCircle2 size={16} /> Confirm & Issue Digital Receipt (₹{payingFee.amount})
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
-      {/* 3. CAMP JERSEY STORE TAB */}
+      {/* 3. PHOTO GALLERY TAB */}
+      {activeTab === 'gallery' && (
+        <GalleryView 
+          galleryImages={galleryImages}
+          onAddImage={onAddGalleryImage || (() => {})}
+          onDeleteImage={onDeleteGalleryImage || (() => {})}
+          role="student"
+        />
+      )}
+
+      {/* 4. CAMP JERSEY STORE TAB */}
       {activeTab === 'store' && (
         <StudentJerseyStore
           student={student}

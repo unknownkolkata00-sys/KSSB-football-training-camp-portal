@@ -72,9 +72,13 @@ export default function PlayerIDCardModal({
             <div className="flex items-center gap-2.5">
               <img 
                 src={logo || '/logo.jpg'} 
-                onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }}
+                onError={(e) => {
+                  const img = e.currentTarget as HTMLImageElement;
+                  img.onerror = null;
+                  img.src = '/logo.jpg';
+                }}
                 alt="KSSB FC Crest" 
-                className="w-12 h-12 rounded-xl border border-amber-400 object-contain bg-white p-0.5 shadow-md shrink-0"
+                className="w-12 h-12 rounded-xl border-2 border-amber-400 object-cover bg-slate-900 shadow-md shrink-0"
                 referrerPolicy="no-referrer"
               />
               <div>
@@ -97,18 +101,16 @@ export default function PlayerIDCardModal({
             {/* Player Captured Camera Photo / Avatar */}
             <div className="col-span-5 flex flex-col items-center">
               <div className="w-28 h-32 sm:w-32 sm:h-36 rounded-xl border-2 border-amber-400 overflow-hidden bg-slate-800 shadow-lg relative flex items-center justify-center group">
-                {student.photoUrl ? (
-                  <img 
-                    src={student.photoUrl} 
-                    alt={student.name} 
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center p-2 text-center text-slate-400 bg-slate-800/80 w-full h-full">
-                    <User size={40} className="text-slate-500 mb-1" />
-                    <span className="text-[9px] font-mono uppercase font-bold text-slate-400">Photo Pending</span>
-                  </div>
-                )}
+                <img 
+                  src={student.photoUrl && student.photoUrl.trim() !== '' ? student.photoUrl : (logo || '/logo.jpg')} 
+                  alt={student.name} 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const img = e.currentTarget as HTMLImageElement;
+                    img.onerror = null;
+                    img.src = '/logo.jpg';
+                  }}
+                />
                 {/* Position Overlay Badge */}
                 <span className="absolute bottom-1 right-1 bg-amber-500 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded uppercase shadow-sm">
                   {student.position}

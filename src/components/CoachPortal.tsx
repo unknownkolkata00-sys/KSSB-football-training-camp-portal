@@ -4,6 +4,7 @@ import { UserCheck, Activity, CreditCard, Lock, CheckCircle2, Clock, Check, Phon
 import TournamentScheduler from './TournamentScheduler';
 import GalleryView from './GalleryView';
 import kssbFcLogo from '../assets/images/kssb_fc_official_logo.jpg';
+import StudentAvatar from './StudentAvatar';
 
 interface CoachPortalProps {
   students: Student[];
@@ -13,6 +14,8 @@ interface CoachPortalProps {
   galleryImages?: GalleryImage[];
   onAddMetric: (metric: Omit<PerformanceMetric, 'id'>) => void;
   onUpdateTournament?: (tournament: Tournament) => void;
+  onAddGalleryImage?: (image: Omit<GalleryImage, 'id' | 'date'>) => void;
+  onDeleteGalleryImage?: (id: string) => void;
 }
 
 export default function CoachPortal({
@@ -22,7 +25,9 @@ export default function CoachPortal({
   tournaments = [],
   galleryImages = [],
   onAddMetric,
-  onUpdateTournament
+  onUpdateTournament,
+  onAddGalleryImage,
+  onDeleteGalleryImage
 }: CoachPortalProps) {
   const [activeSubTab, setActiveSubTab] = useState<'attendance' | 'performance' | 'tournaments' | 'gallery' | 'pending_fees'>('attendance');
 
@@ -164,9 +169,13 @@ export default function CoachPortal({
           <div className="flex items-center gap-3.5">
             <img 
               src={kssbFcLogo || '/logo.jpg'} 
-              onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }}
+              onError={(e) => {
+                const img = e.currentTarget as HTMLImageElement;
+                img.onerror = null;
+                img.src = '/logo.jpg';
+              }}
               alt="KSSB FC Official Crest" 
-              className="w-14 h-14 rounded-xl border border-amber-400/40 object-contain bg-white p-1 shadow-md shrink-0"
+              className="w-14 h-14 rounded-xl border-2 border-amber-400/80 object-cover bg-slate-900 shadow-md shrink-0"
               referrerPolicy="no-referrer"
             />
             <div className="space-y-1">
@@ -240,6 +249,25 @@ export default function CoachPortal({
         </div>
       </div>
 
+      {/* Back Navigation Bar for Coach Portal */}
+      {activeSubTab !== 'attendance' && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 p-3.5 px-5 rounded-2xl border border-slate-800 text-slate-100 shadow-md" id="coach-back-to-overview-bar">
+          <button
+            onClick={() => setActiveSubTab('attendance')}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-sm border border-emerald-400/30 w-fit"
+            id="coach-back-to-overview-btn"
+          >
+            <ArrowLeft size={16} /> Back to Attendance Marking & Main Overview
+          </button>
+          <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+            <span>Active Coach Module:</span>
+            <span className="px-2.5 py-1 bg-slate-800 text-yellow-400 font-bold rounded-lg text-[11px] uppercase tracking-wider border border-slate-700">
+              {activeSubTab.replace('_', ' ')}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Alert Banner */}
       {alert && (
         <div className={`p-4 rounded-xl border text-sm font-semibold flex items-center justify-between shadow-sm ${
@@ -301,9 +329,12 @@ export default function CoachPortal({
                 return (
                   <div key={s.id} className="p-4 bg-gray-50/80 border border-gray-200 rounded-2xl space-y-3">
                     <div className="flex justify-between items-start">
-                      <div>
-                        <div className="font-bold text-gray-900 text-base">{s.name}</div>
-                        <div className="text-xs text-gray-500 font-mono">Reg: {s.registrationNumber || 'KSSBFC0001/26-27'}</div>
+                      <div className="flex items-center gap-2.5">
+                        <StudentAvatar photoUrl={s.photoUrl} name={s.name} size="md" />
+                        <div>
+                          <div className="font-bold text-gray-900 text-sm leading-tight">{s.name}</div>
+                          <div className="text-xs text-gray-500 font-mono">Reg: {s.registrationNumber || 'KSSBFC0001/26-27'}</div>
+                        </div>
                       </div>
                       <span className="px-2.5 py-1 rounded bg-white border border-gray-200 text-gray-800 font-mono text-[10px] font-bold">
                         {s.position}
@@ -376,8 +407,13 @@ export default function CoachPortal({
                     return (
                       <tr key={s.id} className="hover:bg-gray-50/60">
                         <td className="p-3">
-                          <div className="font-bold text-gray-900 text-sm">{s.name}</div>
-                          <div className="text-[11px] text-gray-500 font-mono">Reg: {s.registrationNumber || 'KSSBFC0001/26-27'}</div>
+                          <div className="flex items-center gap-3">
+                            <StudentAvatar photoUrl={s.photoUrl} name={s.name} size="md" />
+                            <div>
+                              <div className="font-bold text-gray-900 text-sm leading-tight">{s.name}</div>
+                              <div className="text-[11px] text-gray-500 font-mono">Reg: {s.registrationNumber || 'KSSBFC0001/26-27'}</div>
+                            </div>
+                          </div>
                         </td>
                         <td className="p-3">
                           <span className="px-2.5 py-1 rounded bg-gray-100 text-gray-700 font-mono text-[10px] font-bold">
@@ -628,12 +664,12 @@ export default function CoachPortal({
         />
       )}
 
-      {/* 4. PHOTO GALLERY (COACH VIEW ONLY) */}
+      {/* 4. PHOTO GALLERY (COACH VIEW) */}
       {activeSubTab === 'gallery' && (
         <GalleryView 
           galleryImages={galleryImages}
-          onAddImage={() => {}}
-          onDeleteImage={() => {}}
+          onAddImage={onAddGalleryImage || (() => {})}
+          onDeleteImage={onDeleteGalleryImage || (() => {})}
           role="coach"
         />
       )}

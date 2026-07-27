@@ -59,9 +59,13 @@ export default function ReceiptModal({ fee, student, onClose }: ReceiptModalProp
             <div className="flex items-center gap-3">
               <img 
                 src={logo || '/logo.jpg'} 
-                onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }} 
+                onError={(e) => {
+                  const img = e.currentTarget as HTMLImageElement;
+                  img.onerror = null;
+                  img.src = '/logo.jpg';
+                }} 
                 alt="KSSB FC Logo" 
-                className="w-12 h-12 rounded-xl border border-emerald-600 object-contain bg-white p-0.5 shrink-0 shadow-sm" 
+                className="w-12 h-12 rounded-xl border-2 border-emerald-700 object-cover bg-slate-900 shrink-0 shadow-sm" 
               />
               <div>
                 <h2 className="text-sm font-black text-gray-900 uppercase tracking-tight font-sans">

@@ -132,6 +132,11 @@ export default function StudentJerseyStore({
                         src={jersey.imageUrl} 
                         alt={jersey.name} 
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          const img = e.currentTarget as HTMLImageElement;
+                          img.onerror = null;
+                          img.src = '/logo.jpg';
+                        }}
                       />
                       <div className="absolute top-3 right-3 bg-slate-900/95 text-yellow-400 font-mono font-black text-base px-3.5 py-1 rounded-xl shadow-lg border border-yellow-400/40">
                         ₹{jersey.price}.00
@@ -220,7 +225,16 @@ export default function StudentJerseyStore({
                   <tr key={order.id} className="hover:bg-gray-50/60">
                     <td className="p-3 font-bold text-gray-900 flex items-center gap-2">
                       {order.jerseyImageUrl && (
-                        <img src={order.jerseyImageUrl} alt={order.jerseyName} className="w-8 h-8 rounded-lg object-cover border border-gray-200 shrink-0" />
+                        <img 
+                          src={order.jerseyImageUrl} 
+                          alt={order.jerseyName} 
+                          className="w-8 h-8 rounded-lg object-cover border border-gray-200 shrink-0" 
+                          onError={(e) => {
+                            const img = e.currentTarget as HTMLImageElement;
+                            img.onerror = null;
+                            img.src = '/logo.jpg';
+                          }}
+                        />
                       )}
                       <span>{order.jerseyName}</span>
                     </td>

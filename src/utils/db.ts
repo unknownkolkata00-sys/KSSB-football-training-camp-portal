@@ -155,6 +155,14 @@ export const db = {
     const students = db.getStudents();
     db.saveStudents(students.map(s => s.id === updated.id ? updated : s));
   },
+  deleteStudent: (id: string) => {
+    const students = db.getStudents();
+    db.saveStudents(students.filter(s => s.id !== id));
+    const fees = db.getFees();
+    db.saveFees(fees.filter(f => f.studentId !== id));
+    const metrics = db.getMetrics();
+    db.saveMetrics(metrics.filter(m => m.studentId !== id));
+  },
 
   // Metrics
   getMetrics: () => getLocalStorageData<PerformanceMetric>(STORAGE_KEYS.METRICS, SEED_METRICS),

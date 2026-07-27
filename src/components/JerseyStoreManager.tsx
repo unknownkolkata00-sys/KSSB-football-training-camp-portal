@@ -210,6 +210,11 @@ export default function JerseyStoreManager({
                       src={j.imageUrl} 
                       alt={j.name} 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                      onError={(e) => {
+                        const img = e.currentTarget as HTMLImageElement;
+                        img.onerror = null;
+                        img.src = '/logo.jpg';
+                      }}
                     />
                     <div className="absolute top-3 right-3 bg-slate-900/90 text-yellow-400 font-mono font-black text-sm px-3 py-1 rounded-xl shadow border border-yellow-400/30">
                       ₹{j.price}.00

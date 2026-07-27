@@ -1,5 +1,5 @@
 // Service Worker for KSSB FC Web App
-const CACHE_NAME = 'kssb-fc-v2';
+const CACHE_NAME = 'kssb-fc-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

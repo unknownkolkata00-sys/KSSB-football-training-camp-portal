@@ -3,6 +3,7 @@ import { Student, PerformanceMetric } from '../types';
 import { Sparkles, Activity, Clock, Award, ShieldAlert, AlignLeft, BarChart2, Download } from 'lucide-react';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { downloadAttendanceReportCSV } from '../utils/reports';
+import StudentAvatar from './StudentAvatar';
 
 interface PlayerPerformanceViewProps {
   students: Student[];
@@ -95,24 +96,29 @@ export default function PlayerPerformanceView({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {role === 'student' ? (
-            <div className="px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-xs font-mono font-bold text-emerald-800 uppercase">Active Athlete:</span>
-              <strong className="text-xs text-emerald-950 font-bold">{student?.name} ({student?.position})</strong>
+            <div className="px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3">
+              <StudentAvatar photoUrl={student?.photoUrl} name={student?.name || 'Athlete'} size="sm" />
+              <div>
+                <span className="text-[10px] font-mono font-bold text-emerald-800 uppercase block">Active Athlete:</span>
+                <strong className="text-xs text-emerald-950 font-bold">{student?.name} ({student?.position})</strong>
+              </div>
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-mono font-bold text-gray-700 uppercase">Select Athlete Profile:</label>
-                <select
-                  value={selectedStudentId}
-                  onChange={(e) => setSelectedStudentId(e.target.value)}
-                  className="px-3.5 py-2 border border-gray-200 rounded-lg text-sm bg-white font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
-                >
-                  {students.map(s => (
-                    <option key={s.id} value={s.id}>{s.name} ({s.position})</option>
-                  ))}
-                </select>
+              <div className="flex items-center gap-3">
+                {student && <StudentAvatar photoUrl={student.photoUrl} name={student.name} size="sm" />}
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-mono font-bold text-gray-700 uppercase">Select Athlete Profile:</label>
+                  <select
+                    value={selectedStudentId}
+                    onChange={(e) => setSelectedStudentId(e.target.value)}
+                    className="px-3.5 py-2 border border-gray-200 rounded-lg text-sm bg-white font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+                  >
+                    {students.map(s => (
+                      <option key={s.id} value={s.id}>{s.name} ({s.position})</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <button

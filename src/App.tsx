@@ -19,6 +19,8 @@ import {
   saveNotificationToCloud,
   saveEvaluationToCloud,
   saveGalleryImageToCloud,
+  deleteGalleryImageFromCloud,
+  deleteStudentFromCloud,
   saveJerseyToCloud,
   saveJerseyOrderToCloud,
   seedInitialCloudDataIfEmpty
@@ -124,8 +126,27 @@ export default function App() {
   });
 
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [navigationHistory, setNavigationHistory] = useState<string[]>(['dashboard']);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showAndroidModal, setShowAndroidModal] = useState(false);
+
+  const selectTab = (tabId: string) => {
+    if (tabId !== activeTab) {
+      setNavigationHistory(prev => [...prev, activeTab]);
+      setActiveTab(tabId);
+    }
+    setMobileMenuOpen(false);
+  };
+
+  const handleGoBack = () => {
+    if (navigationHistory.length > 0) {
+      const previous = navigationHistory[navigationHistory.length - 1];
+      setNavigationHistory(prev => prev.slice(0, -1));
+      setActiveTab(previous);
+    } else {
+      setActiveTab('dashboard');
+    }
+  };
 
   // Load baseline & Subscribe to real-time Firestore multi-handset updates
   useEffect(() => {
@@ -140,7 +161,8 @@ export default function App() {
     setNotifications(initialNotis);
     const initialEvals = db.getEvaluations();
     setEvaluations(initialEvals);
-    setGalleryImages(db.getGallery());
+    const initialGallery = db.getGallery();
+    setGalleryImages(initialGallery);
     setJerseys(db.getJerseys());
     setJerseyOrders(db.getJerseyOrders());
 
@@ -150,7 +172,7 @@ export default function App() {
 
 
     // 2. Seed default cloud records if cloud database is empty
-    seedInitialCloudDataIfEmpty(initialNotis, initialEvals);
+    seedInitialCloudDataIfEmpty(initialNotis, initialEvals, initialGallery);
 
     // 3. Real-time Firebase Firestore subscriptions for Multi-Handset Live Sync
     const unsubStudents = subscribeStudents((cloudStudents) => {
@@ -239,6 +261,14 @@ export default function App() {
     saveStudentToCloud(updatedStudent);
   };
 
+  const handleDeleteStudent = (studentId: string) => {
+    db.deleteStudent(studentId);
+    setStudents(db.getStudents());
+    setFees(db.getFees());
+    setMetrics(db.getMetrics());
+    deleteStudentFromCloud(studentId);
+  };
+
   const handleAddMetric = (metric: Omit<PerformanceMetric, 'id'>) => {
     const newMetric = db.addMetric(metric);
     setMetrics(db.getMetrics());
@@ -296,6 +326,7 @@ export default function App() {
   const handleDeleteGalleryImage = (id: string) => {
     db.deleteGalleryImage(id);
     setGalleryImages(db.getGallery());
+    deleteGalleryImageFromCloud(id);
   };
 
   const handleAddJersey = (jersey: Omit<CampJersey, 'id' | 'createdAt'>) => {
@@ -362,12 +393,6 @@ export default function App() {
     downloadAnchor.remove();
   };
 
-  // Safe tab selection
-  const selectTab = (tabId: string) => {
-    setActiveTab(tabId);
-    setMobileMenuOpen(false);
-  };
-
   // Sidebar Items for Admin Mode
   const adminSidebarItems = [
     { id: 'dashboard', label: 'Overview Dashboard', icon: LayoutDashboard },
@@ -431,12 +456,16 @@ export default function App() {
         {/* Portal Branding */}
         <div className="p-5 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-white p-0.5 shadow-md border border-amber-400/40 shrink-0">
+            <div className="w-11 h-11 rounded-xl bg-slate-950 shadow-md border-2 border-amber-400/80 overflow-hidden shrink-0">
               <img 
                 src={kssbFcLogo || '/logo.jpg'} 
-                onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }}
+                onError={(e) => {
+                  const img = e.currentTarget as HTMLImageElement;
+                  img.onerror = null;
+                  img.src = '/logo.jpg';
+                }}
                 alt="KSSB FC Logo" 
-                className="w-full h-full object-contain rounded-[8px]"
+                className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
               />
             </div>
@@ -571,12 +600,16 @@ export default function App() {
         id="mobile-header"
       >
         <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-xl bg-white p-0.5 border border-amber-400/40 shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-slate-950 border-2 border-amber-400/80 shadow-md overflow-hidden shrink-0">
             <img 
               src={kssbFcLogo || '/logo.jpg'} 
-              onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }}
+              onError={(e) => {
+                const img = e.currentTarget as HTMLImageElement;
+                img.onerror = null;
+                img.src = '/logo.jpg';
+              }}
               alt="KSSB FC" 
-              className="w-full h-full object-contain rounded-[8px]"
+              className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
             />
           </div>
@@ -649,18 +682,27 @@ export default function App() {
             {/* 1. ADMIN LOGIN VIEW */}
             {role === 'admin' && (
               <>
-                {/* Back to Dashboard Navigation Header Bar */}
+                {/* Back Navigation Header Bar */}
                 {activeTab !== 'dashboard' && (
                   <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 p-3.5 px-5 rounded-2xl border border-slate-800 text-slate-100 shadow-md" id="admin-back-to-dashboard-bar">
-                    <button
-                      onClick={() => selectTab('dashboard')}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-sm border border-emerald-400/30 w-fit"
-                      id="back-to-dashboard-btn"
-                    >
-                      <ArrowLeft size={16} /> Back to Overview Dashboard
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={handleGoBack}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-sm border border-emerald-400/30"
+                        id="back-to-previous-btn"
+                      >
+                        <ArrowLeft size={16} /> Back to Previous Screen
+                      </button>
+                      <button
+                        onClick={() => selectTab('dashboard')}
+                        className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border border-slate-700"
+                        id="back-to-dashboard-btn"
+                      >
+                        <LayoutDashboard size={14} className="text-emerald-400" /> Overview Dashboard
+                      </button>
+                    </div>
                     <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-                      <span>Active Admin Module:</span>
+                      <span>Active Module:</span>
                       <span className="px-2.5 py-1 bg-slate-800 text-yellow-400 font-bold rounded-lg text-[11px] uppercase tracking-wider border border-slate-700">
                         {activeTab.replace('_', ' ')}
                       </span>
@@ -684,6 +726,7 @@ export default function App() {
                     userRole={role}
                     onAddStudent={handleAddStudent}
                     onUpdateStudent={handleUpdateStudent}
+                    onDeleteStudent={handleDeleteStudent}
                     onAddMetric={handleAddMetric}
                   />
                 )}
@@ -773,6 +816,8 @@ export default function App() {
                 galleryImages={galleryImages}
                 onAddMetric={handleAddMetric}
                 onUpdateTournament={handleUpdateTournament}
+                onAddGalleryImage={handleAddGalleryImage}
+                onDeleteGalleryImage={handleDeleteGalleryImage}
               />
             )}
 
@@ -790,6 +835,8 @@ export default function App() {
                 onSelectStudent={setLoggedInStudentId}
                 onUpdateFee={handleUpdateFee}
                 onPlaceOrder={handlePlaceJerseyOrder}
+                onAddGalleryImage={handleAddGalleryImage}
+                onDeleteGalleryImage={handleDeleteGalleryImage}
               />
             )}
 

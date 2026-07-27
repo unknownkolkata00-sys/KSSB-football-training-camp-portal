@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { GalleryImage } from '../types';
-import { Image as ImageIcon, Plus, X, Tag, Calendar, User, ShieldAlert, Eye, Filter, Trash2, Camera } from 'lucide-react';
+import { Image as ImageIcon, Plus, X, Tag, Calendar, User, ShieldAlert, Eye, Filter, Trash2, Camera, Upload } from 'lucide-react';
 
 interface GalleryViewProps {
   galleryImages: GalleryImage[];
@@ -9,6 +9,51 @@ interface GalleryViewProps {
   role: 'admin' | 'coach' | 'student';
 }
 
+// Helper function to compress uploaded photos for lightweight Firestore & local storage
+const compressPhotoFile = (file: File, maxDimension = 1000, initialQuality = 0.7): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(event.target?.result as string);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        let quality = initialQuality;
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+        // Keep string size safely below 500KB for Firestore document limits
+        while (dataUrl.length > 500000 && quality > 0.3) {
+          quality -= 0.1;
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+        }
+        resolve(dataUrl);
+      };
+      img.onerror = () => resolve(event.target?.result as string);
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
 export default function GalleryView({
   galleryImages,
   onAddImage,
@@ -16,6 +61,9 @@ export default function GalleryView({
   role
 }: GalleryViewProps) {
   const isAdmin = role === 'admin';
+  const isCoach = role === 'coach';
+  const canDelete = isAdmin || isCoach;
+
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<GalleryImage | null>(null);
@@ -37,11 +85,13 @@ export default function GalleryView({
     e.preventDefault();
     if (!title.trim() || !imageUrl.trim()) return;
 
+    const uploaderLabel = role === 'admin' ? 'Admin' : role === 'coach' ? 'Coach' : 'Student';
+
     onAddImage({
       title: title.trim(),
       category,
       imageUrl: imageUrl.trim(),
-      uploadedBy: 'Admin',
+      uploadedBy: uploaderLabel,
       caption: caption.trim()
     });
 
@@ -70,15 +120,9 @@ export default function GalleryView({
             <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 font-mono font-bold text-[10px] uppercase rounded border border-emerald-500/30">
               KSSB FC Photo Vault
             </span>
-            {isAdmin ? (
-              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold uppercase rounded">
-                Admin Upload Rights Active
-              </span>
-            ) : (
-              <span className="px-2 py-0.5 bg-slate-800 text-slate-300 font-mono text-[10px] font-bold uppercase rounded border border-slate-700">
-                View Only Mode ({role.toUpperCase()})
-              </span>
-            )}
+            <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold uppercase rounded">
+              Uploads Syncing Live ({role.toUpperCase()})
+            </span>
           </div>
           <h2 className="text-2xl font-black font-sans tracking-tight text-white flex items-center gap-2">
             <Camera className="text-emerald-400" size={24} />
@@ -89,21 +133,14 @@ export default function GalleryView({
           </p>
         </div>
 
-        {isAdmin ? (
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-2 shadow-md transition-all cursor-pointer shrink-0"
-            id="admin-add-gallery-btn"
-          >
-            <Plus size={16} />
-            Upload New Photo
-          </button>
-        ) : (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/80 rounded-xl border border-slate-700 text-slate-300 text-xs font-mono">
-            <ShieldAlert size={14} className="text-amber-400 shrink-0" />
-            <span>Adding images is restricted to Admin rights only</span>
-          </div>
-        )}
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-2 shadow-md transition-all cursor-pointer shrink-0"
+          id="admin-add-gallery-btn"
+        >
+          <Plus size={16} />
+          Upload New Photo
+        </button>
       </div>
 
       {/* Category Tabs */}
@@ -135,9 +172,12 @@ export default function GalleryView({
                 <img
                   src={img.imageUrl}
                   alt={img.title}
+                  referrerPolicy="no-referrer"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80';
+                    const img = e.currentTarget as HTMLImageElement;
+                    img.onerror = null;
+                    img.src = '/logo.jpg';
                   }}
                 />
                 <div className="absolute top-3 left-3">
@@ -153,7 +193,7 @@ export default function GalleryView({
                   >
                     <Eye size={14} /> Full View
                   </button>
-                  {isAdmin && onDeleteImage && (
+                  {canDelete && onDeleteImage && (
                     <button
                       onClick={() => onDeleteImage(img.id)}
                       className="px-3 py-1.5 bg-rose-600 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-md hover:bg-rose-700 cursor-pointer"
@@ -261,15 +301,41 @@ export default function GalleryView({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-mono font-bold text-gray-700 uppercase">Image URL *</label>
-                <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/photo-..."
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none"
-                  required
-                />
+                <label className="text-xs font-mono font-bold text-gray-700 uppercase">Attach Photo File or Provide URL *</label>
+                <div className="flex flex-col sm:flex-row gap-2 items-center">
+                  <input
+                    type="text"
+                    placeholder="Paste image URL (e.g. https://...)"
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none"
+                    required
+                  />
+                  <label className="w-full sm:w-auto px-4 py-2.5 bg-slate-900 text-white hover:bg-slate-800 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shrink-0 border border-slate-700">
+                    <Upload size={14} className="text-emerald-400" />
+                    <span className="whitespace-nowrap">Attach File</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try {
+                            const compressedDataUrl = await compressPhotoFile(file);
+                            setImageUrl(compressedDataUrl);
+                            if (!title) {
+                              const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
+                              setTitle(nameWithoutExt);
+                            }
+                          } catch (err) {
+                            console.error('Failed to compress photo:', err);
+                          }
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
               </div>
 
               {imageUrl && (

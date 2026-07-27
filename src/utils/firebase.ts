@@ -5,6 +5,7 @@ import {
   onSnapshot, 
   doc, 
   setDoc, 
+  deleteDoc,
   getDocs,
   writeBatch
 } from 'firebase/firestore';
@@ -168,6 +169,14 @@ export async function saveStudentToCloud(student: Student) {
   }
 }
 
+export async function deleteStudentFromCloud(id: string) {
+  try {
+    await deleteDoc(doc(firestoreDb, COLLECTIONS.STUDENTS, id));
+  } catch (err) {
+    console.error('Failed to delete student from Firestore:', err);
+  }
+}
+
 export async function saveMetricToCloud(metric: PerformanceMetric) {
   try {
     await setDoc(doc(firestoreDb, COLLECTIONS.METRICS, metric.id), metric);
@@ -224,6 +233,14 @@ export async function saveGalleryImageToCloud(image: GalleryImage) {
   }
 }
 
+export async function deleteGalleryImageFromCloud(id: string) {
+  try {
+    await deleteDoc(doc(firestoreDb, COLLECTIONS.GALLERY, id));
+  } catch (err) {
+    console.error('Failed to delete gallery image from Firestore:', err);
+  }
+}
+
 /**
  * Real-time listener for Camp Jerseys
  */
@@ -273,11 +290,12 @@ export async function saveJerseyOrderToCloud(order: JerseyOrder) {
 
 
 /**
- * Ensures initial local seed notifications and coach evals exist in Firestore if cloud collection is empty.
+ * Ensures initial local seed notifications, coach evals, and gallery images exist in Firestore if cloud collection is empty.
  */
 export async function seedInitialCloudDataIfEmpty(
   seedNotifications: NotificationLog[],
-  seedEvals: CoachEvaluation[]
+  seedEvals: CoachEvaluation[],
+  seedGallery: GalleryImage[] = []
 ) {
   try {
     const notiSnap = await getDocs(collection(firestoreDb, COLLECTIONS.NOTIFICATIONS));
@@ -294,6 +312,15 @@ export async function seedInitialCloudDataIfEmpty(
       const batch = writeBatch(firestoreDb);
       seedEvals.forEach(e => {
         batch.set(doc(firestoreDb, COLLECTIONS.EVALUATIONS, e.id), e);
+      });
+      await batch.commit();
+    }
+
+    const gallerySnap = await getDocs(collection(firestoreDb, COLLECTIONS.GALLERY));
+    if (gallerySnap.empty && seedGallery.length > 0) {
+      const batch = writeBatch(firestoreDb);
+      seedGallery.forEach(g => {
+        batch.set(doc(firestoreDb, COLLECTIONS.GALLERY, g.id), g);
       });
       await batch.commit();
     }

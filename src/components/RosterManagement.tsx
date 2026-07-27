@@ -4,6 +4,7 @@ import logo from '../assets/images/kssb_fc_official_logo.jpg';
 import { UserPlus, FileSpreadsheet, Search, Check, AlertCircle, Sparkles, X, Edit3, Phone, MapPin, User, ShieldCheck, Camera, Trash2, IdCard } from 'lucide-react';
 import PlayerIDCardModal from './PlayerIDCardModal';
 import PassportPhotoCapture from './PassportPhotoCapture';
+import StudentAvatar from './StudentAvatar';
 
 interface RosterManagementProps {
   students: Student[];
@@ -11,6 +12,7 @@ interface RosterManagementProps {
   userRole?: 'admin' | 'coach' | 'student';
   onAddStudent: (student: Omit<Student, 'id' | 'registrationDate'>) => void;
   onUpdateStudent?: (student: Student) => void;
+  onDeleteStudent?: (studentId: string) => void;
   onAddMetric: (metric: Omit<PerformanceMetric, 'id'>) => void;
 }
 
@@ -20,6 +22,7 @@ export default function RosterManagement({
   userRole = 'admin',
   onAddStudent,
   onUpdateStudent,
+  onDeleteStudent,
   onAddMetric
 }: RosterManagementProps) {
   const [showRegForm, setShowRegForm] = useState(false);
@@ -28,6 +31,7 @@ export default function RosterManagement({
   
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [deletingStudent, setDeletingStudent] = useState<Student | null>(null);
 
   // Player ID Card Modal state
   const [idCardStudent, setIdCardStudent] = useState<Student | null>(null);
@@ -196,7 +200,7 @@ export default function RosterManagement({
       {/* Control Actions Header */}
       <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-4 md:items-center justify-between" id="roster-actions-header">
         <div className="flex items-center gap-4">
-          <img src={logo || '/logo.jpg'} onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }} alt="KSSB FC Logo" className="w-14 h-14 rounded-xl border border-amber-400/40 object-contain bg-white p-1 shadow-sm shrink-0" />
+          <img src={logo || '/logo.jpg'} onError={(e) => { const img = e.currentTarget as HTMLImageElement; img.onerror = null; img.src = '/logo.jpg'; }} alt="KSSB FC Logo" className="w-14 h-14 rounded-xl border-2 border-amber-400/80 object-cover bg-slate-900 shadow-sm shrink-0" />
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono font-bold text-emerald-700 uppercase tracking-widest">KSSB FC Registration Hub</span>
@@ -242,7 +246,7 @@ export default function RosterManagement({
             </button>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pb-4 border-b border-gray-100 pr-8">
-              <img src={logo || '/logo.jpg'} onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }} alt="KSSB FC Logo" className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl border border-emerald-600 object-contain bg-white p-0.5 shrink-0" />
+              <img src={logo || '/logo.jpg'} onError={(e) => { const img = e.currentTarget as HTMLImageElement; img.onerror = null; img.src = '/logo.jpg'; }} alt="KSSB FC Logo" className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl border-2 border-emerald-600 object-cover bg-slate-900 shrink-0" />
               <div className="min-w-0 flex-1">
                 <span className="text-[10px] font-mono font-bold text-emerald-700 uppercase tracking-widest block">New Player Enrollment</span>
                 <h3 className="text-lg sm:text-xl font-black text-gray-900 leading-tight">Student Profile Registration</h3>
@@ -418,7 +422,7 @@ export default function RosterManagement({
             </button>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pb-4 border-b border-gray-100 pr-8">
-              <img src={logo || '/logo.jpg'} onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }} alt="KSSB FC Logo" className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl border border-emerald-600 object-contain bg-white p-0.5 shrink-0" />
+              <img src={logo || '/logo.jpg'} onError={(e) => { const img = e.currentTarget as HTMLImageElement; img.onerror = null; img.src = '/logo.jpg'; }} alt="KSSB FC Logo" className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl border-2 border-emerald-600 object-cover bg-slate-900 shrink-0" />
               <div className="min-w-0 flex-1">
                 <span className="text-[10px] font-mono font-bold text-amber-600 uppercase tracking-widest block">Admin Edit Permissions Only</span>
                 <h3 className="text-lg sm:text-xl font-black text-gray-900 leading-tight">Edit Student Profile ({editingStudent.registrationNumber})</h3>
@@ -706,7 +710,7 @@ export default function RosterManagement({
               <div key={student.id} className="p-4 bg-gray-50/70 border border-gray-200 rounded-2xl space-y-3">
                 <div className="flex justify-between items-start gap-2">
                   <div className="flex items-center gap-2.5">
-                    <img src={logo || '/logo.jpg'} onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }} alt="KSSB FC Logo" className="w-10 h-10 rounded-xl border border-emerald-600 object-contain bg-white p-0.5 shrink-0" />
+                    <StudentAvatar photoUrl={student.photoUrl} name={student.name} size="md" />
                     <div>
                       <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md inline-block mb-0.5">
                         {student.registrationNumber || 'KSSBFC0001/26-27'}
@@ -753,16 +757,26 @@ export default function RosterManagement({
                     ID Card
                   </button>
                   {userRole === 'admin' && (
-                    <button 
-                      onClick={() => {
-                        setEditingStudent(student);
-                        setShowEditForm(true);
-                      }}
-                      className="py-2 px-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      <Edit3 size={13} />
-                      Edit
-                    </button>
+                    <>
+                      <button 
+                        onClick={() => {
+                          setEditingStudent(student);
+                          setShowEditForm(true);
+                        }}
+                        className="py-2 px-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Edit3 size={13} />
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => setDeletingStudent(student)}
+                        className="py-2 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
+                        title="Delete Player Profile (Admin Only)"
+                      >
+                        <Trash2 size={13} />
+                        Delete
+                      </button>
+                    </>
                   )}
                   <button 
                     onClick={() => {
@@ -802,11 +816,7 @@ export default function RosterManagement({
                   <tr key={student.id} className="hover:bg-emerald-50/20 transition-colors">
                     <td className="p-4">
                       <div className="flex items-center gap-3">
-                        {student.photoUrl ? (
-                          <img src={student.photoUrl} alt={student.name} className="w-10 h-10 rounded-xl border-2 border-emerald-600 object-cover shrink-0 shadow-xs" />
-                        ) : (
-                          <img src={logo || '/logo.jpg'} onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.jpg'; }} alt="KSSB FC Logo" className="w-9 h-9 rounded-lg border border-emerald-600 object-contain bg-white p-0.5 shrink-0" />
-                        )}
+                        <StudentAvatar photoUrl={student.photoUrl} name={student.name} size="md" />
                         <div>
                           <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md inline-block mb-0.5">
                             {student.registrationNumber || 'KSSBFC0001/26-27'}
@@ -854,16 +864,26 @@ export default function RosterManagement({
                           ID Card
                         </button>
                         {userRole === 'admin' && (
-                          <button 
-                            onClick={() => {
-                              setEditingStudent(student);
-                              setShowEditForm(true);
-                            }}
-                            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold shadow-sm transition-all inline-flex items-center gap-1 cursor-pointer"
-                          >
-                            <Edit3 size={13} />
-                            Edit Profile
-                          </button>
+                          <>
+                            <button 
+                              onClick={() => {
+                                setEditingStudent(student);
+                                setShowEditForm(true);
+                              }}
+                              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold shadow-sm transition-all inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <Edit3 size={13} />
+                              Edit Profile
+                            </button>
+                            <button 
+                              onClick={() => setDeletingStudent(student)}
+                              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all inline-flex items-center gap-1 cursor-pointer"
+                              title="Delete Player Profile (Admin Only)"
+                            >
+                              <Trash2 size={13} />
+                              Delete
+                            </button>
+                          </>
                         )}
                         <button 
                           onClick={() => {
@@ -905,6 +925,64 @@ export default function RosterManagement({
         student={idCardStudent}
         autoGeneratedNotice={isAutoGeneratedNotice}
       />
+
+      {/* Admin Delete Confirmation Modal */}
+      {deletingStudent && userRole === 'admin' && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl relative border border-rose-100">
+            <button 
+              type="button"
+              onClick={() => setDeletingStudent(null)}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+              <div className="p-3 bg-rose-100 text-rose-600 rounded-2xl shrink-0">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <span className="text-[10px] font-mono font-bold text-rose-600 uppercase tracking-wider block">Admin Action Only</span>
+                <h3 className="text-lg font-black text-gray-900">Delete Player Registration</h3>
+              </div>
+            </div>
+
+            <div className="p-4 bg-rose-50/70 rounded-2xl border border-rose-100 text-xs space-y-2">
+              <p className="font-bold text-gray-900">
+                Are you sure you want to permanently delete player profile <span className="text-rose-700 underline">{deletingStudent.name}</span> ({deletingStudent.registrationNumber || 'Registration Record'})?
+              </p>
+              <p className="text-gray-600">
+                This will remove the player profile, credentials, and performance records from the academy database.
+              </p>
+            </div>
+
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingStudent(null)}
+                className="px-4 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteStudent && deletingStudent) {
+                    onDeleteStudent(deletingStudent.id);
+                    setAlert({ type: 'success', message: `Player profile ${deletingStudent.name} (${deletingStudent.registrationNumber || 'ID'}) has been deleted.` });
+                    setDeletingStudent(null);
+                  }
+                }}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 size={16} />
+                <span>Confirm Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

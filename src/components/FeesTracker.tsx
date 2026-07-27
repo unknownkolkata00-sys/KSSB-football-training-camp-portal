@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Student, FeeStatus } from '../types';
-import { Check, CreditCard, IndianRupee, Search, AlertCircle, FileText, CheckCircle2, Clock, AlertTriangle, Download, ShieldCheck, Tag } from 'lucide-react';
+import { Check, CreditCard, IndianRupee, Search, AlertCircle, FileText, CheckCircle2, Clock, AlertTriangle, Download, ShieldCheck, Tag, Lock } from 'lucide-react';
 import { downloadFeesReportCSV } from '../utils/reports';
 import ReceiptModal from './ReceiptModal';
+import StudentAvatar from './StudentAvatar';
 
 interface FeesTrackerProps {
   students: Student[];
@@ -33,15 +34,12 @@ export default function FeesTracker({
   // Viewing Receipt modal state
   const [selectedReceiptFee, setSelectedReceiptFee] = useState<FeeStatus | null>(null);
 
-  // Student Specific payment states
-  const [cardNo, setCardNo] = useState('');
-  const [expiry, setExpiry] = useState('');
-  const [cvv, setCvv] = useState('');
-  const [isPaying, setIsPaying] = useState(false);
-  const [paySuccess, setPaySuccess] = useState(false);
-
-  // Helper to mark registration fee received
+  // Helper to mark registration fee received (Admin Only)
   const handleMarkRegistrationFeeReceived = (regFee: FeeStatus) => {
+    if (regFee.status === 'Paid') {
+      alert('This fee is already settled and locked.');
+      return;
+    }
     const today = new Date().toISOString().split('T')[0];
     const recNum = regFee.receiptNumber || `KSSB-REG-2026-${String(Math.floor(1000 + Math.random() * 9000))}`;
     onUpdateFee({
@@ -56,6 +54,12 @@ export default function FeesTracker({
   const handleSavePayment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingFee) return;
+
+    if (editingFee.status === 'Paid') {
+      alert('Fees marked as settled cannot be changed.');
+      setEditingFee(null);
+      return;
+    }
 
     const isReg = editingFee.feeType === 'Registration' || editingFee.month === 'Registration Fee';
     const recPrefix = isReg ? 'KSSB-REG-2026-' : 'KSSB-MON-2026-';
@@ -86,28 +90,6 @@ export default function FeesTracker({
       status: 'Pending' as const
     };
 
-    // Find Active Monthly Fee (e.g. July 2026)
-    const activeMonthlyFee = studentLedger.find(f => (f.feeType === 'Monthly' || f.month !== 'Registration Fee') && f.month === selectedMonth) ||
-      studentLedger.find(f => f.feeType === 'Monthly' || f.month !== 'Registration Fee');
-
-    const handleStudentMockPayment = (feeToPay: FeeStatus) => {
-      setIsPaying(true);
-      setTimeout(() => {
-        const isReg = feeToPay.feeType === 'Registration' || feeToPay.month === 'Registration Fee';
-        const recNum = feeToPay.receiptNumber || `KSSB-${isReg ? 'REG' : 'MON'}-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-        onUpdateFee({
-          ...feeToPay,
-          status: 'Paid',
-          paymentDate: new Date().toISOString().split('T')[0],
-          paymentMethod: 'Online Payment Portal',
-          receiptNumber: recNum
-        });
-        setIsPaying(false);
-        setPaySuccess(true);
-        setTimeout(() => setPaySuccess(false), 4000);
-      }, 1200);
-    };
-
     const totalPaid = studentLedger.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);
     const totalOutstanding = studentLedger.filter(f => f.status !== 'Paid').reduce((sum, f) => sum + f.amount, 0);
 
@@ -126,7 +108,7 @@ export default function FeesTracker({
         {/* Header */}
         <div className="space-y-1" id="student-fees-header">
           <h2 className="text-2xl font-black text-gray-900 font-sans">Student Fee Ledger & Digital Invoices</h2>
-          <p className="text-sm text-gray-500">View one-time Registration Fee status (₹350), monthly training fees (₹150), and download receipts.</p>
+          <p className="text-sm text-gray-500">View one-time Registration Fee status (₹350), monthly training fees (₹150), and download receipts. Payment settlement is handled by Club Admin.</p>
         </div>
 
         {/* Registration Fee Summary Banner */}
@@ -158,14 +140,10 @@ export default function FeesTracker({
               View Registration Fee Receipt
             </button>
           ) : (
-            <button 
-              onClick={() => handleStudentMockPayment(regFee)}
-              disabled={isPaying}
-              className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-2 shadow-sm transition-all cursor-pointer shrink-0"
-            >
-              <CreditCard size={15} />
-              Settle Registration Fee (₹350)
-            </button>
+            <div className="px-4 py-2.5 bg-amber-500/20 text-amber-300 rounded-xl text-xs font-bold border border-amber-500/30 flex items-center gap-2 shrink-0">
+              <Clock size={16} />
+              Pending Admin Settlement
+            </div>
           )}
         </div>
 
@@ -237,12 +215,9 @@ export default function FeesTracker({
                             <FileText size={12} /> Receipt View
                           </button>
                         ) : (
-                          <button 
-                            onClick={() => handleStudentMockPayment(fee)}
-                            className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[11px] font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
-                          >
-                            Pay ₹{fee.amount}
-                          </button>
+                          <span className="px-2.5 py-1 bg-amber-50 text-amber-800 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 border border-amber-200">
+                            <Clock size={12} /> Pending Settlement
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -297,6 +272,17 @@ export default function FeesTracker({
   return (
     <div className="space-y-6" id="fees-tracker-root">
       
+      {/* Admin Fee Rights & Permanent Record Notice */}
+      <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-2xl text-slate-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+        <div className="flex items-center gap-2">
+          <ShieldCheck size={18} className="text-amber-400 shrink-0" />
+          <span><strong>Admin Settlement Policy:</strong> Fees settlement is exclusively under admin rights. Once marked as settled (Paid), records are locked permanently and cannot be changed.</span>
+        </div>
+        <span className="px-2.5 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800/80 rounded-lg text-[10px] font-mono font-bold uppercase shrink-0">
+          Admin Rights Active
+        </span>
+      </div>
+
       {/* Receipt Modal */}
       {selectedReceiptFee && (
         <ReceiptModal 
@@ -500,14 +486,17 @@ export default function FeesTracker({
               return (
                 <div key={fee.id} className="p-4 bg-gray-50/80 border border-gray-200 rounded-2xl space-y-3">
                   <div className="flex justify-between items-start gap-2">
-                    <div>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase inline-block mb-1 ${
-                        isReg ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-indigo-100 text-indigo-900 border border-indigo-200'
-                      }`}>
-                        {isReg ? 'Registration Fee (₹350)' : `Monthly Fee (${fee.month})`}
-                      </span>
-                      <div className="font-extrabold text-gray-900 text-base">{student?.name || 'Unknown student'}</div>
-                      <div className="text-xs text-gray-500 font-mono">Reg: {student?.registrationNumber}</div>
+                    <div className="flex items-center gap-2.5">
+                      <StudentAvatar photoUrl={student?.photoUrl} name={student?.name || 'Athlete'} size="md" />
+                      <div>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase inline-block mb-0.5 ${
+                          isReg ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-indigo-100 text-indigo-900 border border-indigo-200'
+                        }`}>
+                          {isReg ? 'Registration Fee (₹350)' : `Monthly Fee (${fee.month})`}
+                        </span>
+                        <div className="font-extrabold text-gray-900 text-sm leading-tight">{student?.name || 'Unknown student'}</div>
+                        <div className="text-[11px] text-gray-500 font-mono">Reg: {student?.registrationNumber}</div>
+                      </div>
                     </div>
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${
                       fee.status === 'Paid' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'
@@ -548,12 +537,17 @@ export default function FeesTracker({
                     )}
 
                     {fee.status === 'Paid' && (
-                      <button
-                        onClick={() => setSelectedReceiptFee(fee)}
-                        className="w-full py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-xl text-xs font-bold border border-emerald-200 transition-all cursor-pointer text-center flex items-center justify-center gap-1.5"
-                      >
-                        <FileText size={14} /> View Digital Receipt
-                      </button>
+                      <div className="w-full flex items-center justify-between gap-2">
+                        <span className="px-2.5 py-1 bg-slate-100 text-slate-700 font-mono text-[10px] font-bold rounded-lg border border-slate-200 inline-flex items-center gap-1">
+                          <Lock size={10} className="text-slate-500" /> Locked Record
+                        </span>
+                        <button
+                          onClick={() => setSelectedReceiptFee(fee)}
+                          className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-xl text-xs font-bold border border-emerald-200 transition-all cursor-pointer inline-flex items-center gap-1.5"
+                        >
+                          <FileText size={14} /> View Digital Receipt
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -590,8 +584,13 @@ export default function FeesTracker({
                       
                       {/* Student Details */}
                       <td className="p-4">
-                        <div className="font-bold text-gray-900 text-sm">{student?.name || 'Unknown Athlete'}</div>
-                        <div className="text-[11px] font-mono text-emerald-800 font-bold">Reg: {student?.registrationNumber || 'N/A'}</div>
+                        <div className="flex items-center gap-3">
+                          <StudentAvatar photoUrl={student?.photoUrl} name={student?.name || 'Athlete'} size="md" />
+                          <div>
+                            <div className="font-bold text-gray-900 text-sm leading-tight">{student?.name || 'Unknown Athlete'}</div>
+                            <div className="text-[11px] font-mono text-emerald-800 font-bold">Reg: {student?.registrationNumber || 'N/A'}</div>
+                          </div>
+                        </div>
                       </td>
 
                       {/* Fee Category */}
@@ -651,12 +650,17 @@ export default function FeesTracker({
                           )}
 
                           {fee.status === 'Paid' && (
-                            <button
-                              onClick={() => setSelectedReceiptFee(fee)}
-                              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-lg text-xs font-bold border border-emerald-200 transition-all cursor-pointer inline-flex items-center gap-1"
-                            >
-                              <FileText size={14} /> Receipt View
-                            </button>
+                            <div className="inline-flex items-center gap-2">
+                              <span className="px-2 py-1 bg-slate-100 text-slate-700 font-mono text-[10px] font-bold rounded-lg border border-slate-200 inline-flex items-center gap-1">
+                                <Lock size={10} className="text-slate-500" /> Settled & Locked
+                              </span>
+                              <button
+                                onClick={() => setSelectedReceiptFee(fee)}
+                                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-lg text-xs font-bold border border-emerald-200 transition-all cursor-pointer inline-flex items-center gap-1"
+                              >
+                                <FileText size={14} /> Receipt View
+                              </button>
+                            </div>
                           )}
                         </div>
                       </td>
