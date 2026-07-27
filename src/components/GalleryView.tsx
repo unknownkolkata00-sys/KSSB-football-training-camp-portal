@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GalleryImage } from '../types';
-import { Image as ImageIcon, Plus, X, Tag, Calendar, User, ShieldAlert, Eye, Filter, Trash2, Camera, Upload } from 'lucide-react';
+import { Image as ImageIcon, Plus, X, Tag, Calendar, User, ShieldAlert, Eye, Filter, Trash2, Camera, Upload, Lock, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface GalleryViewProps {
   galleryImages: GalleryImage[];
@@ -61,8 +61,8 @@ export default function GalleryView({
   role
 }: GalleryViewProps) {
   const isAdmin = role === 'admin';
-  const isCoach = role === 'coach';
-  const canDelete = isAdmin || isCoach;
+  const canAdd = isAdmin;
+  const canDelete = isAdmin;
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -80,6 +80,30 @@ export default function GalleryView({
   const filteredImages = selectedCategory === 'All'
     ? galleryImages
     : galleryImages.filter(img => img.category === selectedCategory);
+
+  // Keyboard navigation for Full Screen Lightbox
+  useEffect(() => {
+    if (!lightboxImage) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setLightboxImage(null);
+      } else if (e.key === 'ArrowLeft') {
+        const idx = filteredImages.findIndex(i => i.id === lightboxImage.id);
+        if (idx > 0) {
+          setLightboxImage(filteredImages[idx - 1]);
+        }
+      } else if (e.key === 'ArrowRight') {
+        const idx = filteredImages.findIndex(i => i.id === lightboxImage.id);
+        if (idx >= 0 && idx < filteredImages.length - 1) {
+          setLightboxImage(filteredImages[idx + 1]);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxImage, filteredImages]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,14 +157,21 @@ export default function GalleryView({
           </p>
         </div>
 
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-2 shadow-md transition-all cursor-pointer shrink-0"
-          id="admin-add-gallery-btn"
-        >
-          <Plus size={16} />
-          Upload New Photo
-        </button>
+        {canAdd ? (
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-2 shadow-md transition-all cursor-pointer shrink-0"
+            id="admin-add-gallery-btn"
+          >
+            <Plus size={16} />
+            Upload New Photo
+          </button>
+        ) : (
+          <div className="px-3.5 py-2 bg-slate-800/90 text-slate-300 rounded-xl text-xs font-mono font-bold flex items-center gap-2 border border-slate-700/80 shrink-0 shadow-inner" id="student-gallery-vault-notice">
+            <Lock size={14} className="text-amber-400" />
+            <span>Admin Rights Only • Uploads Restricted</span>
+          </div>
+        )}
       </div>
 
       {/* Category Tabs */}
@@ -166,7 +197,8 @@ export default function GalleryView({
           filteredImages.map(img => (
             <div
               key={img.id}
-              className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col group"
+              onClick={() => setLightboxImage(img)}
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all overflow-hidden flex flex-col group cursor-pointer"
             >
               <div className="relative aspect-video overflow-hidden bg-slate-900">
                 <img
@@ -175,9 +207,9 @@ export default function GalleryView({
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   onError={(e) => {
-                    const img = e.currentTarget as HTMLImageElement;
-                    img.onerror = null;
-                    img.src = '/logo.jpg';
+                    const target = e.currentTarget as HTMLImageElement;
+                    target.onerror = null;
+                    target.src = '/logo.jpg';
                   }}
                 />
                 <div className="absolute top-3 left-3">
@@ -188,14 +220,22 @@ export default function GalleryView({
 
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-3">
                   <button
-                    onClick={() => setLightboxImage(img)}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLightboxImage(img);
+                    }}
                     className="px-3 py-1.5 bg-white text-gray-900 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md hover:bg-gray-100 cursor-pointer"
                   >
-                    <Eye size={14} /> Full View
+                    <Eye size={14} /> Full Screen
                   </button>
                   {canDelete && onDeleteImage && (
                     <button
-                      onClick={() => onDeleteImage(img.id)}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteImage(img.id);
+                      }}
                       className="px-3 py-1.5 bg-rose-600 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-md hover:bg-rose-700 cursor-pointer"
                     >
                       <Trash2 size={14} /> Delete
@@ -381,42 +421,122 @@ export default function GalleryView({
         </div>
       )}
 
-      {/* Lightbox Preview Modal */}
-      {lightboxImage && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in" id="gallery-lightbox-modal">
-          <div className="max-w-4xl w-full bg-slate-900 rounded-3xl overflow-hidden border border-slate-800 text-white shadow-2xl relative space-y-0">
-            <button
-              onClick={() => setLightboxImage(null)}
-              className="absolute top-4 right-4 z-10 p-2 bg-black/60 hover:bg-black text-white rounded-full transition-all cursor-pointer"
-            >
-              <X size={20} />
-            </button>
+      {/* Immersive Full Screen Photo Viewer */}
+      {lightboxImage && (() => {
+        const currentIndex = filteredImages.findIndex(i => i.id === lightboxImage.id);
+        const hasPrev = currentIndex > 0;
+        const hasNext = currentIndex >= 0 && currentIndex < filteredImages.length - 1;
 
-            <div className="max-h-[70vh] bg-black flex items-center justify-center overflow-hidden">
+        return (
+          <div
+            className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex flex-col justify-between text-white animate-fade-in select-none"
+            id="gallery-fullscreen-modal"
+          >
+            {/* Top Bar Navigation Controls */}
+            <div className="px-4 py-3 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setLightboxImage(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-xl text-xs font-bold flex items-center gap-2 border border-slate-700 transition-all cursor-pointer shadow-md"
+                id="fullscreen-back-btn"
+              >
+                <ArrowLeft size={16} /> Back to Gallery
+              </button>
+
+              <div className="text-center hidden sm:block">
+                <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 font-mono text-[10px] font-bold uppercase rounded border border-emerald-500/30">
+                  {lightboxImage.category}
+                </span>
+                <p className="text-xs font-mono text-slate-400 mt-0.5">
+                  Photo {currentIndex >= 0 ? currentIndex + 1 : 1} of {filteredImages.length}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setLightboxImage(null)}
+                className="px-4 py-2 bg-rose-950/80 hover:bg-rose-900 text-rose-200 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-rose-800/80 transition-all cursor-pointer shadow-md"
+                id="fullscreen-close-btn"
+              >
+                <X size={16} /> Close Screen
+              </button>
+            </div>
+
+            {/* Main Stage Image Canvas */}
+            <div className="flex-1 relative flex items-center justify-center p-2 sm:p-6 min-h-0 overflow-hidden bg-black">
+              {/* Previous Photo Button */}
+              {hasPrev && (
+                <button
+                  type="button"
+                  onClick={() => setLightboxImage(filteredImages[currentIndex - 1])}
+                  className="absolute left-3 z-10 p-3 bg-slate-900/80 hover:bg-emerald-600 text-white rounded-full border border-slate-700 transition-all cursor-pointer shadow-lg"
+                  title="Previous Photo (Left Arrow)"
+                  id="fullscreen-prev-btn"
+                >
+                  <ChevronLeft size={22} />
+                </button>
+              )}
+
+              {/* Fullscreen Photo */}
               <img
                 src={lightboxImage.imageUrl}
                 alt={lightboxImage.title}
-                className="max-h-[70vh] w-auto object-contain"
+                referrerPolicy="no-referrer"
+                className="max-h-[78vh] w-auto max-w-full object-contain rounded-lg shadow-2xl transition-all"
+                onError={(e) => {
+                  const target = e.currentTarget as HTMLImageElement;
+                  target.onerror = null;
+                  target.src = '/logo.jpg';
+                }}
               />
-            </div>
 
-            <div className="p-6 bg-slate-900 space-y-2">
-              <div className="flex flex-wrap justify-between items-start gap-2">
-                <div>
-                  <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 font-mono text-[10px] font-bold uppercase rounded border border-emerald-500/30">
-                    {lightboxImage.category}
-                  </span>
-                  <h3 className="text-lg font-bold text-white mt-1">{lightboxImage.title}</h3>
-                </div>
-                <span className="text-xs font-mono text-slate-400">{lightboxImage.date}</span>
-              </div>
-              {lightboxImage.caption && (
-                <p className="text-xs text-slate-300 leading-relaxed">{lightboxImage.caption}</p>
+              {/* Next Photo Button */}
+              {hasNext && (
+                <button
+                  type="button"
+                  onClick={() => setLightboxImage(filteredImages[currentIndex + 1])}
+                  className="absolute right-3 z-10 p-3 bg-slate-900/80 hover:bg-emerald-600 text-white rounded-full border border-slate-700 transition-all cursor-pointer shadow-lg"
+                  title="Next Photo (Right Arrow)"
+                  id="fullscreen-next-btn"
+                >
+                  <ChevronRight size={22} />
+                </button>
               )}
             </div>
+
+            {/* Bottom Metadata & Action Bar */}
+            <div className="p-4 sm:p-6 bg-slate-900/95 border-t border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shrink-0">
+              <div className="space-y-1 max-w-2xl">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-white">{lightboxImage.title}</h3>
+                  <span className="sm:hidden text-[10px] font-mono text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
+                    {lightboxImage.category}
+                  </span>
+                </div>
+                {lightboxImage.caption && (
+                  <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">{lightboxImage.caption}</p>
+                )}
+                <div className="flex items-center gap-3 text-[11px] font-mono text-slate-400 pt-0.5">
+                  <span className="flex items-center gap-1">
+                    <Calendar size={12} className="text-emerald-400" /> {lightboxImage.date}
+                  </span>
+                  <span>•</span>
+                  <span>Uploaded by {lightboxImage.uploadedBy}</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setLightboxImage(null)}
+                className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer shrink-0"
+                id="fullscreen-bottom-back-btn"
+              >
+                <ArrowLeft size={16} /> Back to Gallery
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
     </div>
   );

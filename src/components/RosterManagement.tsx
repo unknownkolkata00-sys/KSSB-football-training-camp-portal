@@ -259,6 +259,29 @@ export default function RosterManagement({
             
             <form onSubmit={handleRegister} className="space-y-4">
 
+              {/* Inaugural Admission Offer Callout */}
+              <div className="p-3 bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">🎁</span>
+                  <div>
+                    <div className="text-xs font-black text-gray-900 flex items-center gap-1.5">
+                      Inaugural Admission Offer Active
+                      <span className="px-2 py-0.5 bg-amber-500 text-white font-mono text-[9px] font-extrabold rounded-full uppercase">First 15 Students</span>
+                    </div>
+                    <p className="text-[11px] text-gray-600 font-medium">
+                      {students.length < 15 
+                        ? `This student will receive FREE Registration Admission (₹0) under the inaugural offer! (${students.length} / 15 slots claimed)`
+                        : `Inaugural offer standard limit reached (15 students). Standard registration fee is ₹350.`}
+                    </p>
+                  </div>
+                </div>
+                <span className={`px-2.5 py-1 text-[10px] font-mono font-extrabold rounded-lg shrink-0 ${
+                  students.length < 15 ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' : 'bg-gray-100 text-gray-700'
+                }`}>
+                  {students.length < 15 ? 'FREE ADMISSION' : '₹350 REG FEE'}
+                </span>
+              </div>
+
               {/* Player Passport Photo Capture Component */}
               <PassportPhotoCapture
                 currentPhotoUrl={regPhotoUrl}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { FeeStatus, Student } from '../types';
 import logo from '../assets/images/kssb_fc_official_logo.jpg';
-import { X, Printer, CheckCircle2, ShieldCheck, Download, FileText } from 'lucide-react';
+import { X, Printer, CheckCircle2, ShieldCheck, Download, FileText, ArrowLeft } from 'lucide-react';
 
 interface ReceiptModalProps {
   fee: FeeStatus;
@@ -28,9 +28,19 @@ export default function ReceiptModal({ fee, student, onClose }: ReceiptModalProp
         
         {/* Close & Print Action Buttons */}
         <div className="flex items-center justify-between pb-3 border-b border-gray-100 print:hidden">
-          <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-emerald-800 uppercase">
-            <FileText size={16} className="text-emerald-600" />
-            <span>Digital Payment Voucher</span>
+          <div className="flex items-center gap-2 text-xs font-mono font-bold text-emerald-800 uppercase">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-slate-200"
+              id="receipt-back-btn"
+            >
+              <ArrowLeft size={14} /> Back
+            </button>
+            <span className="hidden sm:inline-flex items-center gap-1">
+              <FileText size={16} className="text-emerald-600" />
+              Digital Payment Voucher
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -44,9 +54,10 @@ export default function ReceiptModal({ fee, student, onClose }: ReceiptModalProp
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 cursor-pointer"
+              className="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer border border-rose-200"
+              id="receipt-close-btn"
             >
-              <X size={18} />
+              <X size={16} /> Close
             </button>
           </div>
         </div>
@@ -118,13 +129,17 @@ export default function ReceiptModal({ fee, student, onClose }: ReceiptModalProp
               <div>
                 <span className="text-[10px] text-gray-400 font-mono uppercase block">Fee Category / Description</span>
                 <span className="font-bold text-gray-800 block">
-                  {isRegistrationFee ? 'One-Time Registration Fee (₹350)' : `Monthly Training Fee (${fee.month})`}
+                  {isRegistrationFee 
+                    ? (fee.amount === 0 
+                        ? 'One-Time Registration Admission (FREE - Inaugural Offer for First 15 Students)' 
+                        : 'One-Time Registration Fee (₹350)')
+                    : `Monthly Training Fee (${fee.month})`}
                 </span>
               </div>
               <div>
                 <span className="text-[10px] text-gray-400 font-mono uppercase block">Settlement Status</span>
                 <span className="inline-flex items-center gap-1 font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-[10px]">
-                  <CheckCircle2 size={12} /> {fee.status === 'Paid' ? 'VERIFIED & PAID' : fee.status}
+                  <CheckCircle2 size={12} /> {fee.amount === 0 ? 'FREE INAUGURAL OFFER' : (fee.status === 'Paid' ? 'VERIFIED & PAID' : fee.status)}
                 </span>
               </div>
             </div>
@@ -133,7 +148,9 @@ export default function ReceiptModal({ fee, student, onClose }: ReceiptModalProp
             <div className="p-4 bg-emerald-950 text-white rounded-2xl space-y-2 shadow-md">
               <div className="flex justify-between items-center border-b border-emerald-800/80 pb-2">
                 <span className="text-xs font-mono text-emerald-300">Total Amount Settled:</span>
-                <span className="text-2xl font-black text-amber-400 font-display">₹{fee.amount}.00</span>
+                <span className="text-2xl font-black text-amber-400 font-display">
+                  {fee.amount === 0 ? 'FREE (₹0.00)' : `₹${fee.amount}.00`}
+                </span>
               </div>
               <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-emerald-200 pt-1">
                 <div>
@@ -142,7 +159,7 @@ export default function ReceiptModal({ fee, student, onClose }: ReceiptModalProp
                 </div>
                 <div>
                   <span className="text-[9px] text-emerald-400 block uppercase">Payment Method</span>
-                  <span className="font-bold">{fee.paymentMethod || 'Cash / Online Transfer'}</span>
+                  <span className="font-bold">{fee.paymentMethod || (fee.amount === 0 ? 'Inaugural Offer (Free Admission)' : 'Cash / Online Transfer')}</span>
                 </div>
               </div>
             </div>
@@ -157,6 +174,27 @@ export default function ReceiptModal({ fee, student, onClose }: ReceiptModalProp
             <span>Authorized Signature / Computer Generated</span>
           </div>
 
+        </div>
+
+        {/* Bottom Actions - Back & Close Options */}
+        <div className="flex flex-col sm:flex-row gap-3 pt-2 print:hidden justify-between items-center">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-all"
+            id="receipt-footer-back-btn"
+          >
+            <ArrowLeft size={16} /> Back to Fee Records
+          </button>
+          
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full sm:w-auto px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-all"
+            id="receipt-footer-close-btn"
+          >
+            <X size={16} /> Close Screen
+          </button>
         </div>
 
       </div>

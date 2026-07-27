@@ -1,7 +1,7 @@
 import React from 'react';
 import { Student } from '../types';
 import logo from '../assets/images/kssb_fc_official_logo.jpg';
-import { X, Printer, ShieldCheck, Sparkles, CheckCircle2, QrCode, User } from 'lucide-react';
+import { X, Printer, ShieldCheck, Sparkles, CheckCircle2, QrCode, User, ArrowLeft } from 'lucide-react';
 
 interface PlayerIDCardModalProps {
   isOpen: boolean;
@@ -29,7 +29,14 @@ export default function PlayerIDCardModal({
         {/* Header Action Controls - Hidden when printing */}
         <div className="flex items-center justify-between pb-3 border-b border-gray-100 print:hidden">
           <div className="flex items-center gap-2">
-            <ShieldCheck size={20} className="text-emerald-600 shrink-0" />
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-slate-200"
+              id="id-card-top-back-btn"
+            >
+              <ArrowLeft size={14} /> Back
+            </button>
             <div>
               <h3 className="text-base font-black text-gray-900 leading-none">Official Player ID Card</h3>
               <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider">KSSB FC Identity Pass</span>
@@ -37,10 +44,11 @@ export default function PlayerIDCardModal({
           </div>
           <button 
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full cursor-pointer transition-colors"
+            className="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer border border-rose-200"
             title="Close ID Card"
+            id="id-card-top-close-btn"
           >
-            <X size={20} />
+            <X size={16} /> Close
           </button>
         </div>
 
@@ -177,21 +185,33 @@ export default function PlayerIDCardModal({
         </div>
 
         {/* Modal Bottom Actions - Hidden when printing */}
-        <div className="flex flex-col sm:flex-row gap-2.5 pt-2 print:hidden">
+        <div className="flex flex-col sm:flex-row gap-2.5 pt-2 print:hidden justify-between items-center">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-all"
+            id="id-card-footer-back-btn"
+          >
+            <ArrowLeft size={16} /> Back
+          </button>
+          
           <button
             type="button"
             onClick={handlePrint}
-            className="flex-1 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+            className="w-full sm:w-auto px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+            id="id-card-footer-print-btn"
           >
             <Printer size={16} />
             <span>Print / Save ID Card</span>
           </button>
+
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all cursor-pointer text-center"
+            className="w-full sm:w-auto px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
+            id="id-card-footer-close-btn"
           >
-            Close
+            <X size={16} /> Close
           </button>
         </div>
 

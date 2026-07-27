@@ -214,8 +214,28 @@ export default function App() {
     });
 
     const unsubGallery = subscribeGallery((cloudGallery) => {
-      setGalleryImages(cloudGallery);
-      db.saveGallery(cloudGallery);
+      const localGallery = db.getGallery();
+      const cloudIds = new Set(cloudGallery.map(g => g.id));
+      
+      // Push local photos to cloud if missing
+      localGallery.forEach(localItem => {
+        if (!cloudIds.has(localItem.id)) {
+          saveGalleryImageToCloud(localItem);
+        }
+      });
+
+      const map = new Map<string, GalleryImage>();
+      cloudGallery.forEach(g => map.set(g.id, g));
+      localGallery.forEach(g => {
+        if (!map.has(g.id)) map.set(g.id, g);
+      });
+
+      const mergedList = Array.from(map.values()).sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+
+      setGalleryImages(mergedList);
+      db.saveGallery(mergedList);
     });
 
     const unsubJerseys = subscribeJerseys((cloudJerseys) => {
@@ -311,6 +331,23 @@ export default function App() {
     saveNotificationToCloud(newNoti);
   };
 
+  const handleMarkNotificationRead = (notificationId: string, studentId: string) => {
+    db.markNotificationAsRead(notificationId, studentId);
+    const updated = db.getNotifications();
+    setNotifications(updated);
+    const target = updated.find(n => n.id === notificationId);
+    if (target) {
+      saveNotificationToCloud(target);
+    }
+  };
+
+  const handleMarkAllNotificationsRead = (studentId: string) => {
+    db.markAllNotificationsAsRead(studentId);
+    const updated = db.getNotifications();
+    setNotifications(updated);
+    updated.forEach(n => saveNotificationToCloud(n));
+  };
+
   const handleAddEvaluation = (evalItem: Omit<CoachEvaluation, 'id' | 'date'>) => {
     const newEval = db.addEvaluation(evalItem);
     setEvaluations(db.getEvaluations());
@@ -402,7 +439,7 @@ export default function App() {
     { id: 'performance', label: 'Attendance & Reviews', icon: Target },
     { id: 'tournaments', label: 'Match Fixtures & Team Selection', icon: Trophy },
     { id: 'gallery', label: 'Photo Vault Gallery', icon: Camera },
-    { id: 'notifications', label: 'Mobile Comms / SMS', icon: Send },
+    { id: 'notifications', label: 'Mobile App Push Alerts', icon: Send },
     { id: 'evaluations', label: 'Coach Evaluations', icon: Award }
   ];
 
@@ -793,6 +830,7 @@ export default function App() {
                 {activeTab === 'notifications' && (
                   <NotificationAutomator 
                     notifications={notifications}
+                    students={students}
                     onAddNotification={handleAddNotification}
                   />
                 )}
@@ -828,6 +866,7 @@ export default function App() {
                 metrics={metrics}
                 fees={fees}
                 tournaments={tournaments}
+                notifications={notifications}
                 galleryImages={galleryImages}
                 jerseys={jerseys}
                 orders={jerseyOrders}
@@ -837,6 +876,8 @@ export default function App() {
                 onPlaceOrder={handlePlaceJerseyOrder}
                 onAddGalleryImage={handleAddGalleryImage}
                 onDeleteGalleryImage={handleDeleteGalleryImage}
+                onMarkAsRead={handleMarkNotificationRead}
+                onMarkAllAsRead={handleMarkAllNotificationsRead}
               />
             )}
 

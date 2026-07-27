@@ -98,6 +98,7 @@ export interface NotificationLog {
   timestamp: string;
   method: 'SMS' | 'Email' | 'Both';
   status: 'Sent' | 'Delivered' | 'Pending';
+  readBy?: string[]; // Student IDs who marked as read
 }
 
 export interface CoachRating {
@@ -136,7 +137,9 @@ export interface JerseyOrder {
   jerseyName: string;
   jerseyImageUrl?: string;
   size: '6yrs' | '8yrs' | '10yrs' | '12yrs' | '14yrs' | '15yrs' | '16yrs' | string;
+  quantity?: number;
   price: number;
+  totalPrice?: number;
   orderDate: string;
   status: 'Pending' | 'Confirmed' | 'Delivered' | 'Cancelled';
   paymentStatus: 'Pending' | 'Paid';

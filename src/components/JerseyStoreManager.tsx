@@ -332,8 +332,9 @@ export default function JerseyStoreManager({
                 <tr>
                   <th className="p-3">Student Name / Reg No</th>
                   <th className="p-3">Jersey Title</th>
-                  <th className="p-3">Selected Size</th>
-                  <th className="p-3">Price</th>
+                  <th className="p-3">Size</th>
+                  <th className="p-3">Qty</th>
+                  <th className="p-3">Total Payable</th>
                   <th className="p-3">Order Date</th>
                   <th className="p-3">Status</th>
                   <th className="p-3 text-right">Actions</th>
@@ -344,6 +345,8 @@ export default function JerseyStoreManager({
                   filteredOrders.map(order => {
                     const studentData = students.find(s => s.id === order.studentId);
                     const phone = order.mobileNo || studentData?.mobileNo || studentData?.parentPhone || '';
+                    const qty = order.quantity || 1;
+                    const total = order.totalPrice || (order.price * qty);
 
                     return (
                       <tr key={order.id} className="hover:bg-gray-50/60">
@@ -359,8 +362,11 @@ export default function JerseyStoreManager({
                             {order.size}
                           </span>
                         </td>
-                        <td className="p-3 font-mono font-bold text-gray-950 text-sm">
-                          ₹{order.price}.00
+                        <td className="p-3 font-mono font-bold text-gray-900 text-xs">
+                          x {qty}
+                        </td>
+                        <td className="p-3 font-mono font-bold text-emerald-900 text-sm">
+                          ₹{total}.00
                         </td>
                         <td className="p-3 text-gray-500 font-mono">
                           {order.orderDate}

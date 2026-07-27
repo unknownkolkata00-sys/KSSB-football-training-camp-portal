@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Smartphone, Download, CheckCircle2, Share2, Sparkles, X, QrCode, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Smartphone, Download, CheckCircle2, Share2, Sparkles, X, QrCode, ShieldCheck, ArrowRight, ArrowLeft } from 'lucide-react';
 import kssbFcLogo from '../assets/images/kssb_fc_official_logo.jpg';
 
 interface AndroidAppModalProps {
@@ -54,13 +54,23 @@ export default function AndroidAppModal({ isOpen, onClose }: AndroidAppModalProp
         <div className="absolute -top-12 -right-12 w-36 h-36 bg-emerald-600/20 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute -bottom-12 -left-12 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
 
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-full hover:bg-slate-800 transition-colors"
-        >
-          <X size={20} />
-        </button>
+        {/* Close Button & Back Button */}
+        <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+          <button
+            onClick={onClose}
+            className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-slate-700"
+            id="android-modal-top-back-btn"
+          >
+            <ArrowLeft size={14} /> Back
+          </button>
+          <button
+            onClick={onClose}
+            className="px-3 py-1 bg-rose-950/80 hover:bg-rose-900 text-rose-300 rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer border border-rose-800/60"
+            id="android-modal-top-close-btn"
+          >
+            <X size={16} /> Close
+          </button>
+        </div>
 
         {/* Header */}
         <div className="flex items-center gap-3">
@@ -137,12 +147,21 @@ export default function AndroidAppModal({ isOpen, onClose }: AndroidAppModalProp
           </div>
         </div>
 
-        <div className="pt-2 text-center">
+        <div className="pt-2 flex flex-col sm:flex-row gap-2 justify-between items-center">
           <button
             onClick={onClose}
-            className="text-xs text-slate-400 hover:text-slate-200 transition-colors font-medium underline cursor-pointer"
+            className="w-full sm:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-slate-700"
+            id="android-modal-bottom-back-btn"
           >
-            Continue in Browser
+            <ArrowLeft size={14} /> Back
+          </button>
+          
+          <button
+            onClick={onClose}
+            className="w-full sm:w-auto px-4 py-2 bg-rose-900/80 hover:bg-rose-800 text-rose-200 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-rose-700/60"
+            id="android-modal-bottom-close-btn"
+          >
+            <X size={14} /> Close Screen
           </button>
         </div>
       </div>

@@ -317,12 +317,19 @@ export async function seedInitialCloudDataIfEmpty(
     }
 
     const gallerySnap = await getDocs(collection(firestoreDb, COLLECTIONS.GALLERY));
-    if (gallerySnap.empty && seedGallery.length > 0) {
+    const existingCloudIds = new Set(gallerySnap.docs.map(d => d.id));
+    if (seedGallery.length > 0) {
       const batch = writeBatch(firestoreDb);
+      let needsCommit = false;
       seedGallery.forEach(g => {
-        batch.set(doc(firestoreDb, COLLECTIONS.GALLERY, g.id), g);
+        if (!existingCloudIds.has(g.id)) {
+          batch.set(doc(firestoreDb, COLLECTIONS.GALLERY, g.id), g);
+          needsCommit = true;
+        }
       });
-      await batch.commit();
+      if (needsCommit) {
+        await batch.commit();
+      }
     }
   } catch (err) {
     console.warn('Could not seed initial cloud data:', err);

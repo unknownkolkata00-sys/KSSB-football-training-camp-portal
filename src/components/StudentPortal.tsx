@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Student, PerformanceMetric, FeeStatus, Tournament, GalleryImage, CampJersey, JerseyOrder } from '../types';
-import { User, Calendar, Award, CreditCard, Trophy, CheckCircle2, AlertCircle, Clock, Star, Users, Phone, Mail, Activity, ArrowUpRight, Zap, Shield, Check, X, ArrowLeft, FileText, Tag, Camera, IdCard, Shirt, ShoppingBag, ChevronRight } from 'lucide-react';
+import { Student, PerformanceMetric, FeeStatus, Tournament, GalleryImage, CampJersey, JerseyOrder, NotificationLog } from '../types';
+import { User, Calendar, Award, CreditCard, Trophy, CheckCircle2, AlertCircle, Clock, Star, Users, Phone, Mail, Activity, ArrowUpRight, Zap, Shield, Check, X, ArrowLeft, FileText, Tag, Camera, IdCard, Shirt, ShoppingBag, ChevronRight, Bell, Share2, MessageCircle } from 'lucide-react';
 import ReceiptModal from './ReceiptModal';
 import TournamentScheduler from './TournamentScheduler';
 import GalleryView from './GalleryView';
@@ -14,6 +14,7 @@ interface StudentPortalProps {
   metrics: PerformanceMetric[];
   fees: FeeStatus[];
   tournaments: Tournament[];
+  notifications?: NotificationLog[];
   galleryImages?: GalleryImage[];
   jerseys?: CampJersey[];
   orders?: JerseyOrder[];
@@ -23,6 +24,8 @@ interface StudentPortalProps {
   onPlaceOrder?: (order: Omit<JerseyOrder, 'id' | 'orderDate'>) => void;
   onAddGalleryImage?: (image: Omit<GalleryImage, 'id' | 'date'>) => void;
   onDeleteGalleryImage?: (id: string) => void;
+  onMarkAsRead?: (notificationId: string, studentId: string) => void;
+  onMarkAllAsRead?: (studentId: string) => void;
 }
 
 export default function StudentPortal({
@@ -30,6 +33,7 @@ export default function StudentPortal({
   metrics,
   fees,
   tournaments,
+  notifications = [],
   galleryImages = [],
   jerseys = [],
   orders = [],
@@ -38,26 +42,36 @@ export default function StudentPortal({
   onUpdateFee,
   onPlaceOrder,
   onAddGalleryImage,
-  onDeleteGalleryImage
+  onDeleteGalleryImage,
+  onMarkAsRead,
+  onMarkAllAsRead
 }: StudentPortalProps) {
   // Fallback to first student if none selected
   const activeStudentId = loggedInStudentId || (students[0]?.id || '');
   const student = students.find(s => s.id === activeStudentId) || students[0];
 
-  const [activeTab, setActiveTab] = useState<'report' | 'fees' | 'matches' | 'gallery' | 'store' | 'profile'>('report');
+  const [activeTab, setActiveTab] = useState<'report' | 'fees' | 'matches' | 'gallery' | 'store' | 'profile' | 'notices'>('report');
+  const [notiFilter, setNotiFilter] = useState<'all' | 'unread' | 'read'>('all');
   const [payingFee, setPayingFee] = useState<FeeStatus | null>(null);
   const [selectedReceiptFee, setSelectedReceiptFee] = useState<FeeStatus | null>(null);
   const [paymentSuccessMsg, setPaymentSuccessMsg] = useState<string | null>(null);
   const [showIdCardModal, setShowIdCardModal] = useState<boolean>(false);
-
+  const [dismissedNotiIds, setDismissedNotiIds] = useState<string[]>([]);
 
   if (!student) {
     return <div className="p-8 text-center text-gray-500">No student profiles found.</div>;
   }
 
+  // Unread notification count for active student
+  const unreadCount = notifications.filter(n => !(n.readBy || []).includes(student.id)).length;
+
   // Filter student-specific records
   const studentMetrics = metrics.filter(m => m.studentId === student.id);
   const studentFees = fees.filter(f => f.studentId === student.id);
+
+  // Active undismissed notifications for alert banner
+  const activeAlerts = notifications.filter(n => !dismissedNotiIds.includes(n.id));
+  const latestAlert = activeAlerts[0];
 
   // Find Registration Fee Record
   const regFeeRecord = studentFees.find(f => f.feeType === 'Registration' || f.month === 'Registration Fee') || {
@@ -121,21 +135,98 @@ export default function StudentPortal({
         />
       )}
 
+      {/* PROMINENT LIVE NOTIFICATION ALERT BANNER FOR STUDENTS */}
+      {latestAlert && (
+        <div className="bg-gradient-to-r from-amber-500 via-rose-600 to-amber-600 border border-amber-400 text-white p-4 sm:p-5 rounded-2xl shadow-xl space-y-3 relative overflow-hidden animate-fade-in">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 bg-white/20 rounded-xl backdrop-blur-sm shrink-0">
+                <Bell size={20} className="text-yellow-200 animate-bounce" />
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 bg-black/30 font-mono text-[10px] font-bold uppercase rounded-md text-amber-200 border border-white/20">
+                    📢 Academy Broadcast Alert
+                  </span>
+                  <span className="text-[11px] font-mono text-amber-100">
+                    Group: {latestAlert.recipientGroup}
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black tracking-tight text-white mt-0.5">
+                  {latestAlert.title}
+                </h3>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {!(latestAlert.readBy || []).includes(student.id) ? (
+                <button
+                  onClick={() => onMarkAsRead?.(latestAlert.id, student.id)}
+                  className="px-3 py-1.5 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black rounded-xl text-xs transition-all cursor-pointer shadow-md flex items-center gap-1.5"
+                >
+                  <CheckCircle2 size={15} />
+                  Mark as Read ✓
+                </button>
+              ) : (
+                <span className="px-2.5 py-1 bg-black/30 text-emerald-200 text-xs font-mono font-bold rounded-xl border border-emerald-400/30 flex items-center gap-1">
+                  <Check size={14} /> Read
+                </span>
+              )}
+              <button
+                onClick={() => setActiveTab('notices')}
+                className="px-3 py-1.5 bg-white text-rose-950 font-bold rounded-xl text-xs hover:bg-amber-100 transition-all cursor-pointer shadow-sm flex items-center gap-1"
+              >
+                View All ({notifications.length})
+              </button>
+              <button
+                onClick={() => setDismissedNotiIds(prev => [...prev, latestAlert.id])}
+                className="p-1.5 bg-black/20 hover:bg-black/40 rounded-xl text-amber-100 cursor-pointer"
+                title="Acknowledge Alert"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+
+          <p className="text-xs text-amber-50 bg-black/20 p-3 rounded-xl whitespace-pre-wrap font-medium border border-white/10 leading-relaxed">
+            {latestAlert.message}
+          </p>
+
+          <div className="flex justify-between items-center text-[10px] font-mono text-amber-200 pt-1">
+            <span>Published: {latestAlert.timestamp}</span>
+            <span>Channel: {latestAlert.method}</span>
+          </div>
+        </div>
+      )}
+
       {/* Back to Dashboard Navigation Header Bar */}
       {activeTab !== 'report' && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 p-3.5 px-5 rounded-2xl border border-slate-800 text-slate-100 shadow-md" id="student-back-to-dashboard-bar">
-          <button
-            onClick={() => setActiveTab('report')}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-sm border border-emerald-400/30 w-fit"
-            id="student-back-to-dashboard-btn"
-          >
-            <ArrowLeft size={16} /> Back to Main Summary Dashboard
-          </button>
-          <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-            <span>Active Student View:</span>
-            <span className="px-2.5 py-1 bg-slate-800 text-yellow-400 font-bold rounded-lg text-[11px] uppercase tracking-wider border border-slate-700">
-              {activeTab}
-            </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('report')}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-sm border border-emerald-400/30"
+              id="student-back-to-dashboard-btn"
+            >
+              <ArrowLeft size={16} /> Back to Main Summary Dashboard
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+              <span>Current Screen:</span>
+              <span className="px-2.5 py-1 bg-slate-800 text-yellow-400 font-bold rounded-lg text-[11px] uppercase tracking-wider border border-slate-700">
+                {activeTab}
+              </span>
+            </div>
+
+            <button
+              onClick={() => setActiveTab('report')}
+              className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm border border-rose-400/30"
+              id="student-close-current-screen-btn"
+            >
+              <X size={16} /> Close Screen
+            </button>
           </div>
         </div>
       )}
@@ -188,6 +279,25 @@ export default function StudentPortal({
           </button>
 
           <button
+            onClick={() => setActiveTab('notices')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 relative ${
+              activeTab === 'notices' ? 'bg-rose-600 text-white shadow-sm' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <Bell size={16} className={unreadCount > 0 ? 'text-amber-300 animate-pulse' : ''} />
+            <span>Announcements & Notices</span>
+            {unreadCount > 0 ? (
+              <span className="px-2 py-0.5 bg-rose-500 text-white font-mono text-[10px] font-black rounded-full animate-bounce shadow-sm">
+                {unreadCount} Unread
+              </span>
+            ) : (
+              <span className="px-1.5 py-0.5 bg-slate-700 text-slate-300 font-mono text-[10px] font-bold rounded-full">
+                {notifications.length}
+              </span>
+            )}
+          </button>
+
+          <button
             onClick={() => setActiveTab('matches')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'matches' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
@@ -234,9 +344,8 @@ export default function StudentPortal({
             }`}
           >
             <User size={16} />
-            Personal Profile & Fees Summary
+            My Athlete Profile
           </button>
-
         </div>
       </div>
 
@@ -420,8 +529,33 @@ export default function StudentPortal({
 
       {/* 2. FEES RECORD DETAILS */}
       {activeTab === 'fees' && (
-        <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-6 shadow-sm">
+        <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-6 shadow-sm" id="student-fees-record-card">
           
+          {/* Header Action Bar with Back & Close Buttons */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-gray-200">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveTab('report')}
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-slate-200"
+                id="fee-record-top-back-btn"
+              >
+                <ArrowLeft size={15} /> Back to Summary
+              </button>
+              <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
+                <CreditCard size={20} className="text-emerald-700" />
+                Personal Tuition & Fee Record
+              </h3>
+            </div>
+            
+            <button
+              onClick={() => setActiveTab('report')}
+              className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-rose-200"
+              id="fee-record-top-close-btn"
+            >
+              <X size={16} /> Close Fee Record
+            </button>
+          </div>
+
           {/* Registration Fee Summary Feature Card */}
           <div className="p-5 bg-gradient-to-r from-emerald-900 via-slate-900 to-teal-950 rounded-2xl text-white shadow-md border border-emerald-800/60 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="space-y-1">
@@ -533,6 +667,175 @@ export default function StudentPortal({
               </tbody>
             </table>
           </div>
+
+          {/* Bottom Navigation Controls for Fee Records */}
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-4 border-t border-gray-100">
+            <button
+              onClick={() => setActiveTab('report')}
+              className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
+              id="fee-record-bottom-back-btn"
+            >
+              <ArrowLeft size={16} /> Back to Summary Dashboard
+            </button>
+
+            <button
+              onClick={() => setActiveTab('report')}
+              className="w-full sm:w-auto px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
+              id="fee-record-bottom-close-btn"
+            >
+              <X size={16} /> Close Fee Record Screen
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2.5 ANNOUNCEMENTS & NOTICES TAB */}
+      {activeTab === 'notices' && (
+        <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-6 shadow-sm" id="student-notices-tab">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-gray-100">
+            <div className="space-y-1">
+              <h3 className="text-xl font-extrabold text-gray-900 flex items-center gap-2">
+                <Bell size={22} className="text-rose-600 animate-bounce" />
+                Academy Broadcasts & Coach Announcements
+              </h3>
+              <p className="text-xs text-gray-500">Official updates regarding practice cancellations, tournament news, team squad selections, and fee alerts.</p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {unreadCount > 0 && (
+                <button
+                  onClick={() => onMarkAllAsRead?.(student.id)}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+                >
+                  <CheckCircle2 size={15} />
+                  Mark All ({unreadCount}) Read
+                </button>
+              )}
+              <span className="px-3 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-full font-mono font-bold text-xs">
+                {notifications.length} Total Notices
+              </span>
+            </div>
+          </div>
+
+          {/* Read / Unread Filter Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 p-2 rounded-xl border border-gray-200">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setNotiFilter('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  notiFilter === 'all' ? 'bg-slate-900 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                All Notices ({notifications.length})
+              </button>
+              <button
+                onClick={() => setNotiFilter('unread')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  notiFilter === 'unread' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <span>🔴 Unread Only</span>
+                {unreadCount > 0 && (
+                  <span className="px-1.5 py-0.2 bg-white text-rose-700 font-mono text-[10px] rounded-full font-black">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setNotiFilter('read')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  notiFilter === 'read' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                ✓ Read ({notifications.length - unreadCount})
+              </button>
+            </div>
+          </div>
+
+          {notifications.length > 0 ? (
+            <div className="space-y-4">
+              {notifications
+                .filter(noti => {
+                  const isRead = (noti.readBy || []).includes(student.id);
+                  if (notiFilter === 'unread') return !isRead;
+                  if (notiFilter === 'read') return isRead;
+                  return true;
+                })
+                .map((noti) => {
+                  const isRead = (noti.readBy || []).includes(student.id);
+
+                  return (
+                    <div 
+                      key={noti.id} 
+                      className={`p-5 rounded-2xl space-y-3 transition-all shadow-sm hover:shadow-md border ${
+                        isRead ? 'bg-slate-50/80 border-gray-200' : 'bg-amber-50/40 border-amber-300 ring-1 ring-amber-400/30'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {!isRead ? (
+                            <span className="px-2.5 py-1 bg-rose-600 text-white font-mono text-[10px] font-black uppercase rounded-lg shadow-xs flex items-center gap-1 animate-pulse">
+                              <AlertCircle size={12} /> UNREAD ALERT
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-mono text-[10px] font-bold uppercase rounded-lg border border-emerald-200 flex items-center gap-1">
+                              <CheckCircle2 size={12} className="text-emerald-600" /> READ
+                            </span>
+                          )}
+
+                          <span className="px-2.5 py-1 bg-gray-200 text-gray-800 font-mono text-[10px] font-bold uppercase rounded-lg">
+                            {noti.recipientGroup}
+                          </span>
+                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-mono text-[10px] font-bold rounded">
+                            App Push Alert
+                          </span>
+                        </div>
+
+                        <span className="text-[11px] font-mono text-gray-500 flex items-center gap-1">
+                          <Clock size={12} /> {noti.timestamp}
+                        </span>
+                      </div>
+
+                      <h4 className="text-base font-bold text-gray-950 font-sans">
+                        {noti.title}
+                      </h4>
+
+                      <div className="p-3.5 bg-white border border-gray-200/80 rounded-xl text-xs sm:text-sm text-gray-800 font-medium whitespace-pre-wrap leading-relaxed font-sans">
+                        {noti.message}
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-2 border-t border-gray-200/60">
+                        <div className="flex items-center gap-2">
+                          {!isRead ? (
+                            <button
+                              onClick={() => onMarkAsRead?.(noti.id, student.id)}
+                              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                            >
+                              <CheckCircle2 size={15} />
+                              Mark as Read ✓
+                            </button>
+                          ) : (
+                            <span className="px-3 py-1.5 bg-emerald-50 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200 flex items-center gap-1.5">
+                              <Check size={14} className="text-emerald-600" /> Read & Checked
+                            </span>
+                          )}
+                        </div>
+
+                        <span className="text-[11px] font-mono text-gray-400 flex items-center gap-1">
+                          <Bell size={12} className="text-emerald-600" /> Official Camp Broadcast
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          ) : (
+            <div className="p-12 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl space-y-3">
+              <Bell size={36} className="mx-auto text-gray-300" />
+              <h4 className="font-bold text-gray-700 text-sm">No Announcements Found</h4>
+              <p className="text-xs text-gray-400 max-w-sm mx-auto">When coaches or academy admins publish new practice updates, tournament news, or team selections, they will appear here instantly.</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -558,13 +861,41 @@ export default function StudentPortal({
 
       {/* 4. PERSONAL PROFILE & RECORDS */}
       {activeTab === 'profile' && (
-        <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-6 shadow-sm">
-          <div className="space-y-1 pb-4 border-b border-gray-100">
-            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <User size={22} className="text-emerald-700" />
-              Personal Athlete Profile & Financial Breakdown
-            </h3>
-            <p className="text-xs text-gray-500">Registered personal details, age category, parent/guardian contact, and complete fee summary.</p>
+        <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-6 shadow-sm" id="student-profile-tab">
+          
+          {/* Header Navigation Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-gray-200">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveTab('report')}
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-slate-200"
+                id="profile-top-back-btn"
+              >
+                <ArrowLeft size={15} /> Back to Summary
+              </button>
+              <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
+                <User size={20} className="text-emerald-700" />
+                Personal Athlete Profile & Financial Breakdown
+              </h3>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveTab('fees')}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                id="profile-top-check-fees-btn"
+              >
+                <CreditCard size={15} /> Check Fee Record
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('report')}
+                className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-rose-200"
+                id="profile-top-close-btn"
+              >
+                <X size={16} /> Close Profile
+              </button>
+            </div>
           </div>
 
           {/* Camp Jersey Store Direct Profile Card */}
@@ -602,14 +933,25 @@ export default function StudentPortal({
                   ₹350 ({regFeeRecord.status})
                 </span>
               </div>
-              {regFeeRecord.status === 'Paid' && (
-                <button 
-                  onClick={() => setSelectedReceiptFee(regFeeRecord)}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setActiveTab('fees')}
+                  className="px-3 py-1.5 bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  id="profile-fee-card-open-fees-btn"
                 >
-                  <FileText size={14} /> Receipt
+                  <CreditCard size={14} /> Open Full Fee Record
                 </button>
-              )}
+
+                {regFeeRecord.status === 'Paid' && (
+                  <button 
+                    onClick={() => setSelectedReceiptFee(regFeeRecord)}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <FileText size={14} /> Receipt
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
@@ -681,6 +1023,35 @@ export default function StudentPortal({
                   <strong className="text-gray-900 font-semibold">{student.parentEmail || '—'}</strong>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Bottom Footer Action Controls for Profile Screen */}
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-4 border-t border-gray-100">
+            <button
+              onClick={() => setActiveTab('report')}
+              className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
+              id="profile-bottom-back-btn"
+            >
+              <ArrowLeft size={16} /> Back to Summary Dashboard
+            </button>
+
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <button
+                onClick={() => setActiveTab('fees')}
+                className="w-full sm:w-auto px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
+                id="profile-bottom-fee-record-btn"
+              >
+                <CreditCard size={16} /> Check Detailed Fee Records
+              </button>
+
+              <button
+                onClick={() => setActiveTab('report')}
+                className="w-full sm:w-auto px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
+                id="profile-bottom-close-btn"
+              >
+                <X size={16} /> Close Profile View
+              </button>
             </div>
           </div>
         </div>

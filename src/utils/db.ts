@@ -83,6 +83,24 @@ const SEED_GALLERY: GalleryImage[] = [
     date: '2026-07-01',
     uploadedBy: 'Admin',
     caption: 'KSSB FC management presenting official club kits to enrolled student athletes.'
+  },
+  {
+    id: 'g4',
+    title: 'Goalkeeping & Defensive Line Masterclass',
+    category: 'Training',
+    imageUrl: 'https://images.unsplash.com/photo-1518091043644-c1d4457512c6?auto=format&fit=crop&w=1200&q=80',
+    date: '2026-07-20',
+    uploadedBy: 'Admin',
+    caption: 'Specialized shot-stopping, cross claims, and 1v1 positioning drills with senior coaches.'
+  },
+  {
+    id: 'g5',
+    title: 'U-17 Academy Championship Trophy Presentation',
+    category: 'Celebrations',
+    imageUrl: 'https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1200&q=80',
+    date: '2026-07-25',
+    uploadedBy: 'Admin',
+    caption: 'Kadamtala Subhas Bhowmick Football Camp lifting the regional academy championship shield.'
   }
 ];
 
@@ -129,16 +147,22 @@ export const db = {
       registrationDate: new Date().toISOString().split('T')[0],
     };
     db.saveStudents([...students, newStudent]);
-    // Create baseline fees (Registration Fee: ₹350 and July Tuition Fee: ₹150)
+    // Create baseline fees (Registration Fee: Free for first 15 students under Inaugural Offer, otherwise ₹350)
     const currentMonth = "July 2026";
     const fees = db.getFees();
+    const isFirst15 = students.length < 15;
+    const todayStr = new Date().toISOString().split('T')[0];
+    
     const f1: FeeStatus = {
       id: 'f_reg_' + Date.now(),
       studentId: newStudent.id,
       feeType: 'Registration',
-      month: 'Registration Fee',
-      amount: 350,
-      status: 'Pending'
+      month: isFirst15 ? 'Registration Fee (Inaugural Free Offer)' : 'Registration Fee',
+      amount: isFirst15 ? 0 : 350,
+      status: isFirst15 ? 'Paid' : 'Pending',
+      paymentMethod: isFirst15 ? 'Inaugural Offer Waived (First 15 Students)' : undefined,
+      paymentDate: isFirst15 ? todayStr : undefined,
+      receiptNumber: isFirst15 ? `KSSB-FREE-OFFER-${String(nextCount).padStart(2, '0')}` : undefined
     };
     const f2: FeeStatus = {
       id: 'f_mon_' + Date.now(),
@@ -274,10 +298,37 @@ export const db = {
       ...notification,
       id: 'n_' + Date.now(),
       timestamp: dateStr,
-      status: 'Delivered'
+      status: 'Delivered',
+      readBy: []
     };
     db.saveNotifications([newNotification, ...notifications]);
     return newNotification;
+  },
+  markNotificationAsRead: (notificationId: string, studentId: string) => {
+    const notifications = db.getNotifications();
+    const updated = notifications.map(n => {
+      if (n.id === notificationId) {
+        const existingRead = n.readBy || [];
+        if (!existingRead.includes(studentId)) {
+          return { ...n, readBy: [...existingRead, studentId] };
+        }
+      }
+      return n;
+    });
+    db.saveNotifications(updated);
+    return updated;
+  },
+  markAllNotificationsAsRead: (studentId: string) => {
+    const notifications = db.getNotifications();
+    const updated = notifications.map(n => {
+      const existingRead = n.readBy || [];
+      if (!existingRead.includes(studentId)) {
+        return { ...n, readBy: [...existingRead, studentId] };
+      }
+      return n;
+    });
+    db.saveNotifications(updated);
+    return updated;
   },
 
   // Coach Evaluations
@@ -295,7 +346,21 @@ export const db = {
   },
 
   // Gallery
-  getGallery: () => getLocalStorageData<GalleryImage>(STORAGE_KEYS.GALLERY, SEED_GALLERY),
+  getGallery: () => {
+    const raw = getLocalStorageData<GalleryImage>(STORAGE_KEYS.GALLERY, SEED_GALLERY);
+    const existingIds = new Set(raw.map(g => g.id));
+    let modified = false;
+    SEED_GALLERY.forEach(seedItem => {
+      if (!existingIds.has(seedItem.id)) {
+        raw.push(seedItem);
+        modified = true;
+      }
+    });
+    if (modified) {
+      saveLocalStorageData(STORAGE_KEYS.GALLERY, raw);
+    }
+    return raw;
+  },
   saveGallery: (data: GalleryImage[]) => saveLocalStorageData(STORAGE_KEYS.GALLERY, data),
   addGalleryImage: (image: Omit<GalleryImage, 'id' | 'date'>) => {
     const gallery = db.getGallery();
