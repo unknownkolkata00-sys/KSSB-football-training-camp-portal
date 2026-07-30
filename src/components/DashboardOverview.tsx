@@ -21,9 +21,12 @@ export default function DashboardOverview({
   // Stats calculations
   const totalRoster = students.filter(s => s.status === 'Active').length;
   
-  // Fee stats calculation
-  const regFees = fees.filter(f => f.feeType === 'Registration' || f.month === 'Registration Fee');
-  const monthlyFees = fees.filter(f => f.feeType !== 'Registration' && f.month !== 'Registration Fee');
+  // Fee stats calculation (only for registered active students)
+  const activeStudentIds = new Set(students.map(s => s.id));
+  const activeFees = fees.filter(f => activeStudentIds.has(f.studentId));
+
+  const regFees = activeFees.filter(f => f.feeType === 'Registration' || f.month.startsWith('Registration Fee'));
+  const monthlyFees = activeFees.filter(f => f.feeType !== 'Registration' && !f.month.startsWith('Registration Fee'));
 
   const regCollected = regFees.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);
   const regPending = regFees.filter(f => f.status !== 'Paid').reduce((sum, f) => sum + f.amount, 0);

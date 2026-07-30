@@ -256,14 +256,17 @@ export default function FeesTracker({
   }
 
   // ALL ADMIN / COACH AGGREGATES:
+  const activeStudentIds = new Set(students.map(s => s.id));
+  const activeFees = fees.filter(f => activeStudentIds.has(f.studentId));
+
   // Registration Fees
-  const allRegFees = fees.filter(f => f.feeType === 'Registration' || f.month.startsWith('Registration Fee'));
+  const allRegFees = activeFees.filter(f => f.feeType === 'Registration' || f.month.startsWith('Registration Fee'));
   const freeRegCount = allRegFees.filter(f => f.amount === 0 || (f.month && f.month.includes('Inaugural'))).length;
   const regFeeCollected = allRegFees.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);
   const regFeePending = allRegFees.filter(f => f.status !== 'Paid').reduce((sum, f) => sum + f.amount, 0);
 
   // Monthly Fees
-  const allMonthlyFees = fees.filter(f => f.feeType !== 'Registration' && !f.month.startsWith('Registration Fee'));
+  const allMonthlyFees = activeFees.filter(f => f.feeType !== 'Registration' && !f.month.startsWith('Registration Fee'));
   const selectedMonthlyFees = selectedMonth === 'All' ? allMonthlyFees : allMonthlyFees.filter(f => f.month === selectedMonth);
   
   const monthlyFeeCollected = selectedMonthlyFees.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);

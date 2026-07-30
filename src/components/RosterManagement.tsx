@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Student, PerformanceMetric } from '../types';
 import { db } from '../utils/db';
 import logo from '../assets/images/kssb_fc_official_logo.jpg';
-import { UserPlus, FileSpreadsheet, Search, Check, AlertCircle, Sparkles, X, Edit3, Phone, MapPin, User, ShieldCheck, Camera, Trash2, IdCard } from 'lucide-react';
+import { UserPlus, FileSpreadsheet, Search, Check, AlertCircle, Sparkles, X, Edit3, Phone, MapPin, User, ShieldCheck, Camera, Trash2, IdCard, Lock } from 'lucide-react';
 import PlayerIDCardModal from './PlayerIDCardModal';
 import PassportPhotoCapture from './PassportPhotoCapture';
 import StudentAvatar from './StudentAvatar';
@@ -33,6 +33,8 @@ export default function RosterManagement({
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [deletingStudent, setDeletingStudent] = useState<Student | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   // Player ID Card Modal state
   const [idCardStudent, setIdCardStudent] = useState<Student | null>(null);
@@ -76,6 +78,14 @@ export default function RosterManagement({
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!regPhotoUrl || !regPhotoUrl.trim()) {
+      setAlert({ 
+        type: 'error', 
+        message: 'Player Passport Photo is MANDATORY! Please upload or capture a photo before saving registration.' 
+      });
+      return;
+    }
+
     if (!regName || !regFatherName || !regMobileNo || !regAddress) {
       setAlert({ type: 'error', message: 'Student Name, Father Name, Address and WhatsApp Mobile No are required!' });
       return;
@@ -165,6 +175,14 @@ export default function RosterManagement({
   const handleSaveEditProfile = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStudent || !onUpdateStudent) return;
+
+    if (!editingStudent.photoUrl || !editingStudent.photoUrl.trim()) {
+      setAlert({ 
+        type: 'error', 
+        message: 'Player Passport Photo is MANDATORY! Please upload or capture a photo for this student profile.' 
+      });
+      return;
+    }
 
     onUpdateStudent(editingStudent);
     setAlert({ type: 'success', message: `Profile updated for ${editingStudent.name} (${editingStudent.registrationNumber})` });
@@ -314,7 +332,7 @@ export default function RosterManagement({
               <PassportPhotoCapture
                 currentPhotoUrl={regPhotoUrl}
                 onPhotoCaptured={(url) => setRegPhotoUrl(url)}
-                label="Player Passport Photo (1:1 Passport Format)"
+                label="Player Passport Photo * (MANDATORY - Save Restricted Without Photo)"
               />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
@@ -1009,7 +1027,7 @@ export default function RosterManagement({
           <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl relative border border-rose-100">
             <button 
               type="button"
-              onClick={() => setDeletingStudent(null)}
+              onClick={() => { setDeletingStudent(null); setDeletePassword(''); setDeleteError(''); }}
               className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"
             >
               <X size={20} />
@@ -1020,43 +1038,83 @@ export default function RosterManagement({
                 <Trash2 size={24} />
               </div>
               <div>
-                <span className="text-[10px] font-mono font-bold text-rose-600 uppercase tracking-wider block">Admin Action Only</span>
+                <span className="text-[10px] font-mono font-bold text-rose-600 uppercase tracking-wider block">Admin Authorization Required</span>
                 <h3 className="text-lg font-black text-gray-900">Delete Player Registration</h3>
               </div>
             </div>
 
             <div className="p-4 bg-rose-50/70 rounded-2xl border border-rose-100 text-xs space-y-2">
               <p className="font-bold text-gray-900">
-                Are you sure you want to permanently delete player profile <span className="text-rose-700 underline">{deletingStudent.name}</span> ({deletingStudent.registrationNumber || 'Registration Record'})?
+                Deleting player profile <span className="text-rose-700 underline">{deletingStudent.name}</span> ({deletingStudent.registrationNumber || 'Registration Record'})
               </p>
               <p className="text-gray-600">
-                This will remove the player profile, credentials, and performance records from the academy database.
+                This player record will be moved to <strong>Deleted Player History</strong> archive. You must enter the security password to authorize deletion.
               </p>
             </div>
 
-            <div className="flex gap-3 justify-end pt-2">
-              <button
-                type="button"
-                onClick={() => setDeletingStudent(null)}
-                className="px-4 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (onDeleteStudent && deletingStudent) {
-                    onDeleteStudent(deletingStudent.id);
-                    setAlert({ type: 'success', message: `Player profile ${deletingStudent.name} (${deletingStudent.registrationNumber || 'ID'}) has been deleted.` });
-                    setDeletingStudent(null);
-                  }
-                }}
-                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer flex items-center gap-1.5"
-              >
-                <Trash2 size={16} />
-                <span>Confirm Delete</span>
-              </button>
-            </div>
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (deletePassword.trim().toLowerCase() !== 'kssb') {
+                  setDeleteError('Incorrect Password! Please enter valid password (kssb) to authorize deletion.');
+                  return;
+                }
+                if (onDeleteStudent && deletingStudent) {
+                  onDeleteStudent(deletingStudent.id);
+                  setAlert({ 
+                    type: 'success', 
+                    message: `Player profile ${deletingStudent.name} (${deletingStudent.registrationNumber || 'ID'}) has been deleted and recorded in Deleted Player History.` 
+                  });
+                  setDeletingStudent(null);
+                  setDeletePassword('');
+                  setDeleteError('');
+                }
+              }} 
+              className="space-y-4"
+            >
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-bold text-gray-800 uppercase flex items-center justify-between">
+                  <span>Enter Security Password to Delete *</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    placeholder="Enter security password..."
+                    value={deletePassword}
+                    onChange={(e) => { setDeletePassword(e.target.value); setDeleteError(''); }}
+                    className="w-full pl-3.5 pr-10 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold focus:bg-white focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                    required
+                    autoFocus
+                  />
+                  <Lock size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                </div>
+                {deleteError && (
+                  <p className="text-[11px] font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle size={12} /> {deleteError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-3 justify-end pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => { setDeletingStudent(null); setDeletePassword(''); setDeleteError(''); }}
+                  className="px-4 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!deletePassword}
+                  className={`px-5 py-2.5 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer flex items-center gap-1.5 transition-all ${
+                    deletePassword ? 'bg-rose-600 hover:bg-rose-700' : 'bg-rose-300 cursor-not-allowed'
+                  }`}
+                >
+                  <Trash2 size={16} />
+                  <span>Authorize & Delete</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

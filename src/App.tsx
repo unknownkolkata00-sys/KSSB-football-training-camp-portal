@@ -22,6 +22,7 @@ import {
   saveGalleryImageToCloud,
   deleteGalleryImageFromCloud,
   deleteStudentFromCloud,
+  deleteStudentFeesFromCloud,
   saveJerseyToCloud,
   deleteJerseyFromCloud,
   saveJerseyOrderToCloud,
@@ -330,6 +331,7 @@ export default function App() {
     setMetrics(db.getMetrics());
     setDeletedStudents(db.getDeletedStudents());
     deleteStudentFromCloud(studentId);
+    deleteStudentFeesFromCloud(studentId);
     if (deletedRecord) {
       saveDeletedStudentToCloud(deletedRecord);
     }

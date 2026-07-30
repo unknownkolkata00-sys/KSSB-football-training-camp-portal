@@ -200,19 +200,21 @@ export const db = {
   addStudent: (student: Omit<Student, 'id' | 'registrationDate'>) => {
     const students = db.getStudents();
     const autoRegNum = db.getNextRegistrationNumber();
-    const totalCount = students.length + db.getDeletedStudents().length + 1;
+    const activeCount = students.length + 1;
     
     const newStudent: Student = {
       ...student,
       registrationNumber: autoRegNum,
-      id: 'p' + totalCount + '_' + Date.now(),
+      id: 'p' + (students.length + db.getDeletedStudents().length + 1) + '_' + Date.now(),
       registrationDate: new Date().toISOString().split('T')[0],
     };
     db.saveStudents([...students, newStudent]);
-    // Create baseline fees (Registration Fee: Free for first 15 students under Inaugural Offer, otherwise ₹350)
+
+    // Create baseline fees (Registration Fee: Free for first 15 active students under Inaugural Offer, otherwise ₹350)
     const currentMonth = "July 2026";
     const fees = db.getFees();
-    const isFirst15 = (students.length + db.getDeletedStudents().length) < 15;
+    // Active student count determines inaugural offer (first 15 active registered students)
+    const isFirst15 = students.length < 15;
     const todayStr = new Date().toISOString().split('T')[0];
     
     const f1: FeeStatus = {
@@ -224,18 +226,22 @@ export const db = {
       status: isFirst15 ? 'Paid' : 'Pending',
       paymentMethod: isFirst15 ? 'Inaugural Offer Waived (First 15 Students)' : undefined,
       paymentDate: isFirst15 ? todayStr : undefined,
-      receiptNumber: isFirst15 ? `KSSB-FREE-OFFER-${String(totalCount).padStart(2, '0')}` : undefined
+      receiptNumber: isFirst15 ? `KSSB-FREE-OFFER-${String(activeCount).padStart(2, '0')}` : undefined
     };
-    const f2: FeeStatus = {
-      id: 'f_mon_' + Date.now(),
+
+    const initialMonths = ["June 2026", "July 2026", "August 2026", "September 2026"];
+    const monthFees: FeeStatus[] = initialMonths.map((mon, idx) => ({
+      id: 'f_mon_' + mon.replace(/\s+/g, '').toLowerCase() + '_' + newStudent.id,
       studentId: newStudent.id,
       feeType: 'Monthly',
-      month: currentMonth,
+      month: mon,
       amount: 150,
       status: 'Pending'
-    };
-    db.saveFees([...fees, f1, f2]);
-    return { newStudent, newFees: [f1, f2] };
+    }));
+
+    const createdFees = [f1, ...monthFees];
+    db.saveFees([...fees, ...createdFees]);
+    return { newStudent, newFees: createdFees };
   },
   updateStudent: (updated: Student) => {
     const students = db.getStudents();
@@ -328,9 +334,10 @@ export const db = {
         return f;
       });
 
-    // Ensure every student has a Registration Fee record
+    // Ensure every active student has a Registration Fee record and Monthly Fee records for active months
+    const activeMonths = ["June 2026", "July 2026", "August 2026", "September 2026"];
     students.forEach(student => {
-      const hasRegFee = normalized.some(f => f.studentId === student.id && (f.feeType === 'Registration' || f.month === 'Registration Fee'));
+      const hasRegFee = normalized.some(f => f.studentId === student.id && (f.feeType === 'Registration' || f.month.startsWith('Registration Fee')));
       if (!hasRegFee) {
         modified = true;
         normalized.push({
@@ -342,6 +349,21 @@ export const db = {
           status: 'Pending'
         });
       }
+
+      activeMonths.forEach(mon => {
+        const hasMonthly = normalized.some(f => f.studentId === student.id && f.feeType === 'Monthly' && f.month === mon);
+        if (!hasMonthly) {
+          modified = true;
+          normalized.push({
+            id: 'f_mon_' + mon.replace(/\s+/g, '').toLowerCase() + '_' + student.id,
+            studentId: student.id,
+            feeType: 'Monthly',
+            month: mon,
+            amount: 150,
+            status: 'Pending'
+          });
+        }
+      });
     });
 
     if (modified || normalized.length !== raw.length) {

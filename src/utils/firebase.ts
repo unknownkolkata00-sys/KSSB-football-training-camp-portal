@@ -7,7 +7,9 @@ import {
   setDoc, 
   deleteDoc,
   getDocs,
-  writeBatch
+  writeBatch,
+  query,
+  where
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { DeletedStudentRecord, Student, PerformanceMetric, FeeStatus, Tournament, InjuryReport, NotificationLog, CoachEvaluation, GalleryImage, CampJersey, JerseyOrder } from '../types';
@@ -275,6 +277,17 @@ export async function saveFeeToCloud(fee: FeeStatus) {
     await setDoc(doc(firestoreDb, COLLECTIONS.FEES, fee.id), fee);
   } catch (err) {
     console.error('Failed to save fee to Firestore:', err);
+  }
+}
+
+export async function deleteStudentFeesFromCloud(studentId: string) {
+  try {
+    const q = query(collection(firestoreDb, COLLECTIONS.FEES), where("studentId", "==", studentId));
+    const querySnapshot = await getDocs(q);
+    const deletePromises = querySnapshot.docs.map(d => deleteDoc(d.ref));
+    await Promise.all(deletePromises);
+  } catch (err) {
+    console.error('Failed to delete student fees from Firestore:', err);
   }
 }
 
