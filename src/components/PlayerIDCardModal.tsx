@@ -156,6 +156,17 @@ export default function PlayerIDCardModal({
                 </div>
               </div>
 
+              {student.aadharNumber && (
+                <div>
+                  <span className="text-[8px] font-mono text-slate-400 uppercase block">
+                    {student.isGuardianAadhar ? "Guardian Aadhar No" : "Aadhar No"}
+                  </span>
+                  <span className="text-[10px] font-mono font-bold text-amber-300 block leading-tight">
+                    {student.aadharNumber}
+                  </span>
+                </div>
+              )}
+
               <div>
                 <span className="text-[8px] font-mono text-slate-400 uppercase block">Address</span>
                 <span className="text-[9px] text-slate-300 line-clamp-1 block leading-tight">{student.address || 'Kadam Tala, West Bengal'}</span>

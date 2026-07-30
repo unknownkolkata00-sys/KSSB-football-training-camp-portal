@@ -10,7 +10,8 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { Student, PerformanceMetric, FeeStatus, Tournament, InjuryReport, NotificationLog, CoachEvaluation, GalleryImage, CampJersey, JerseyOrder } from '../types';
+import { DeletedStudentRecord, Student, PerformanceMetric, FeeStatus, Tournament, InjuryReport, NotificationLog, CoachEvaluation, GalleryImage, CampJersey, JerseyOrder } from '../types';
+import { compressImageFile } from './imageCompressor';
 
 // Initialize Firebase App
 const app = initializeApp(firebaseConfig);
@@ -23,6 +24,7 @@ export const firestoreDb = firebaseConfig.firestoreDatabaseId
 // Firestore Collection References
 const COLLECTIONS = {
   STUDENTS: 'students',
+  DELETED_STUDENTS: 'deleted_students',
   METRICS: 'performance_metrics',
   FEES: 'fee_statuses',
   TOURNAMENTS: 'tournaments',
@@ -36,8 +38,86 @@ const COLLECTIONS = {
 
 
 /**
- * Real-time listener for Students
+ * Real-time listener for Deleted Students
  */
+export function subscribeDeletedStudents(callback: (records: DeletedStudentRecord[]) => void) {
+  return onSnapshot(collection(firestoreDb, COLLECTIONS.DELETED_STUDENTS), (snapshot) => {
+    const list: DeletedStudentRecord[] = [];
+    snapshot.forEach((docSnap) => {
+      list.push({ ...docSnap.data(), id: docSnap.id } as DeletedStudentRecord);
+    });
+    list.sort((a, b) => new Date(b.deletedAt).getTime() - new Date(a.deletedAt).getTime());
+    callback(list);
+  }, (err) => {
+    console.error('Firestore deleted_students snapshot error:', err);
+  });
+}
+
+export async function saveDeletedStudentToCloud(record: DeletedStudentRecord) {
+  try {
+    await setDoc(doc(firestoreDb, COLLECTIONS.DELETED_STUDENTS, record.id), record);
+  } catch (err) {
+    console.error('Failed to save deleted student to Firestore:', err);
+  }
+}
+
+export async function removeDeletedStudentFromCloud(id: string) {
+  try {
+    await deleteDoc(doc(firestoreDb, COLLECTIONS.DELETED_STUDENTS, id));
+  } catch (err) {
+    console.error('Failed to remove deleted student from Firestore:', err);
+  }
+}
+
+export async function deleteFeeFromCloud(feeId: string) {
+  try {
+    await deleteDoc(doc(firestoreDb, COLLECTIONS.FEES, feeId));
+  } catch (err) {
+    console.error('Failed to delete fee from Firestore:', err);
+  }
+}
+
+export async function deleteAllNotificationsFromCloud() {
+  try {
+    const snap = await getDocs(collection(firestoreDb, COLLECTIONS.NOTIFICATIONS));
+    const batch = writeBatch(firestoreDb);
+    snap.docs.forEach(docSnap => {
+      batch.delete(docSnap.ref);
+    });
+    await batch.commit();
+  } catch (err) {
+    console.error('Failed to delete all notifications from Firestore:', err);
+  }
+}
+
+export async function clearAllDataExceptGalleryFromCloud() {
+  const collectionsToClear = [
+    COLLECTIONS.STUDENTS,
+    COLLECTIONS.DELETED_STUDENTS,
+    COLLECTIONS.METRICS,
+    COLLECTIONS.FEES,
+    COLLECTIONS.TOURNAMENTS,
+    COLLECTIONS.INJURIES,
+    COLLECTIONS.NOTIFICATIONS,
+    COLLECTIONS.EVALUATIONS,
+    COLLECTIONS.JERSEY_ORDERS
+  ];
+
+  for (const colName of collectionsToClear) {
+    try {
+      const snap = await getDocs(collection(firestoreDb, colName));
+      if (!snap.empty) {
+        const batch = writeBatch(firestoreDb);
+        snap.docs.forEach(docSnap => {
+          batch.delete(docSnap.ref);
+        });
+        await batch.commit();
+      }
+    } catch (err) {
+      console.error(`Failed to clear collection ${colName} from Firestore:`, err);
+    }
+  }
+}
 export function subscribeStudents(callback: (students: Student[]) => void) {
   return onSnapshot(collection(firestoreDb, COLLECTIONS.STUDENTS), (snapshot) => {
     const list: Student[] = [];
@@ -163,7 +243,12 @@ export function subscribeGallery(callback: (images: GalleryImage[]) => void) {
 // Write Helpers
 export async function saveStudentToCloud(student: Student) {
   try {
-    await setDoc(doc(firestoreDb, COLLECTIONS.STUDENTS, student.id), student);
+    let studentToSave = student;
+    if (student.photoUrl && student.photoUrl.startsWith('data:image') && student.photoUrl.length > 400000) {
+      const compressedPhoto = await compressImageFile(student.photoUrl, 500, 0.75, 300000);
+      studentToSave = { ...student, photoUrl: compressedPhoto };
+    }
+    await setDoc(doc(firestoreDb, COLLECTIONS.STUDENTS, studentToSave.id), studentToSave);
   } catch (err) {
     console.error('Failed to save student to Firestore:', err);
   }
@@ -227,7 +312,12 @@ export async function saveEvaluationToCloud(evalItem: CoachEvaluation) {
 
 export async function saveGalleryImageToCloud(image: GalleryImage) {
   try {
-    await setDoc(doc(firestoreDb, COLLECTIONS.GALLERY, image.id), image);
+    let imgToSave = image;
+    if (image.imageUrl && image.imageUrl.startsWith('data:image') && image.imageUrl.length > 400000) {
+      const compressedUrl = await compressImageFile(image.imageUrl, 800, 0.75, 300000);
+      imgToSave = { ...image, imageUrl: compressedUrl };
+    }
+    await setDoc(doc(firestoreDb, COLLECTIONS.GALLERY, imgToSave.id), imgToSave);
   } catch (err) {
     console.error('Failed to save gallery image to Firestore:', err);
   }
@@ -274,9 +364,22 @@ export function subscribeJerseyOrders(callback: (orders: JerseyOrder[]) => void)
 
 export async function saveJerseyToCloud(jersey: CampJersey) {
   try {
-    await setDoc(doc(firestoreDb, COLLECTIONS.JERSEYS, jersey.id), jersey);
+    let jerseyToSave = jersey;
+    if (jersey.imageUrl && jersey.imageUrl.startsWith('data:image') && jersey.imageUrl.length > 400000) {
+      const compressedUrl = await compressImageFile(jersey.imageUrl, 800, 0.75, 300000);
+      jerseyToSave = { ...jersey, imageUrl: compressedUrl };
+    }
+    await setDoc(doc(firestoreDb, COLLECTIONS.JERSEYS, jerseyToSave.id), jerseyToSave);
   } catch (err) {
     console.error('Failed to save jersey to Firestore:', err);
+  }
+}
+
+export async function deleteJerseyFromCloud(id: string) {
+  try {
+    await deleteDoc(doc(firestoreDb, COLLECTIONS.JERSEYS, id));
+  } catch (err) {
+    console.error('Failed to delete jersey from Firestore:', err);
   }
 }
 
@@ -290,12 +393,13 @@ export async function saveJerseyOrderToCloud(order: JerseyOrder) {
 
 
 /**
- * Ensures initial local seed notifications, coach evals, and gallery images exist in Firestore if cloud collection is empty.
+ * Ensures initial local seed notifications, coach evals, gallery images, and jerseys exist in Firestore if cloud collection is empty.
  */
 export async function seedInitialCloudDataIfEmpty(
   seedNotifications: NotificationLog[],
   seedEvals: CoachEvaluation[],
-  seedGallery: GalleryImage[] = []
+  seedGallery: GalleryImage[] = [],
+  seedJerseys: CampJersey[] = []
 ) {
   try {
     const notiSnap = await getDocs(collection(firestoreDb, COLLECTIONS.NOTIFICATIONS));
@@ -324,6 +428,22 @@ export async function seedInitialCloudDataIfEmpty(
       seedGallery.forEach(g => {
         if (!existingCloudIds.has(g.id)) {
           batch.set(doc(firestoreDb, COLLECTIONS.GALLERY, g.id), g);
+          needsCommit = true;
+        }
+      });
+      if (needsCommit) {
+        await batch.commit();
+      }
+    }
+
+    const jerseySnap = await getDocs(collection(firestoreDb, COLLECTIONS.JERSEYS));
+    const existingCloudJerseyIds = new Set(jerseySnap.docs.map(d => d.id));
+    if (seedJerseys.length > 0) {
+      const batch = writeBatch(firestoreDb);
+      let needsCommit = false;
+      seedJerseys.forEach(j => {
+        if (!existingCloudJerseyIds.has(j.id)) {
+          batch.set(doc(firestoreDb, COLLECTIONS.JERSEYS, j.id), j);
           needsCommit = true;
         }
       });

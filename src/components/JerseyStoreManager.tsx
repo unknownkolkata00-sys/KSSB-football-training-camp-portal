@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { CampJersey, JerseyOrder, Student } from '../types';
+import { compressImageFile } from '../utils/imageCompressor';
 import { ShoppingBag, Plus, Edit2, Trash2, Check, X, Shirt, IndianRupee, Tag, Camera, Upload, CheckCircle2, AlertCircle, Clock, PackageCheck, Filter, Search, Phone } from 'lucide-react';
 
 interface JerseyStoreManagerProps {
@@ -50,9 +51,9 @@ export default function JerseyStoreManager({
 
   const handleOpenAdd = () => {
     setEditingJersey(null);
-    setFormName('KSSB FC Camp Official Jersey 2026');
+    setFormName('');
     setFormPrice(550);
-    setFormDescription('Official Kadamtala Subhas Bhowmick FC high-performance breathable football kit with club crest.');
+    setFormDescription('');
     setFormImageUrl(PRESET_JERSEY_IMAGES[0].url);
     setFormAvailableSizes(DEFAULT_SIZES);
     setFormIsAvailable(true);
@@ -70,16 +71,15 @@ export default function JerseyStoreManager({
     setShowAddModal(true);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          setFormImageUrl(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressed = await compressImageFile(file, 800, 0.75, 400000);
+        setFormImageUrl(compressed);
+      } catch (err) {
+        console.error('Failed to compress jersey photo:', err);
+      }
     }
   };
 
@@ -93,9 +93,18 @@ export default function JerseyStoreManager({
     }
   };
 
-  const handleSubmitJersey = (e: React.FormEvent) => {
+  const handleSubmitJersey = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim() || formPrice <= 0) return;
+
+    let finalImageUrl = formImageUrl || PRESET_JERSEY_IMAGES[0].url;
+    if (finalImageUrl.startsWith('data:image')) {
+      try {
+        finalImageUrl = await compressImageFile(finalImageUrl, 800, 0.75, 400000);
+      } catch (err) {
+        console.error('Error compressing jersey image before save:', err);
+      }
+    }
 
     if (editingJersey) {
       onUpdateJersey({
@@ -103,7 +112,7 @@ export default function JerseyStoreManager({
         name: formName,
         price: Number(formPrice),
         description: formDescription,
-        imageUrl: formImageUrl || PRESET_JERSEY_IMAGES[0].url,
+        imageUrl: finalImageUrl,
         availableSizes: formAvailableSizes,
         isAvailable: formIsAvailable
       });
@@ -112,7 +121,7 @@ export default function JerseyStoreManager({
         name: formName,
         price: Number(formPrice),
         description: formDescription,
-        imageUrl: formImageUrl || PRESET_JERSEY_IMAGES[0].url,
+        imageUrl: finalImageUrl,
         availableSizes: formAvailableSizes,
         isAvailable: formIsAvailable
       });
@@ -256,13 +265,15 @@ export default function JerseyStoreManager({
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm(`Are you sure you want to delete ${j.name}?`)) {
+                        if (confirm(`Are you sure you want to delete ${j.name}? This will permanently remove it from the store.`)) {
                           onDeleteJersey(j.id);
                         }
                       }}
-                      className="px-2.5 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold cursor-pointer"
+                      className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                      title="Delete Jersey"
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={13} className="text-rose-600" />
+                      <span>Delete</span>
                     </button>
                   </div>
                 </div>
@@ -615,7 +626,21 @@ export default function JerseyStoreManager({
                 </label>
               </div>
 
-              <div className="pt-2 flex gap-3">
+              <div className="pt-2 flex items-center gap-3">
+                {editingJersey && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm(`Are you sure you want to delete ${editingJersey.name}? This will permanently remove it from the store.`)) {
+                        onDeleteJersey(editingJersey.id);
+                        setShowAddModal(false);
+                      }
+                    }}
+                    className="px-3 py-2.5 bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                  >
+                    <Trash2 size={14} /> Delete
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}

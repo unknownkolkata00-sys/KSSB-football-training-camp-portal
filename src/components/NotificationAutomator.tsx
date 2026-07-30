@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import { NotificationLog, Student } from '../types';
-import { Send, Sparkles, RefreshCw, CheckCircle, Clock, AlertCircle, Zap, Smartphone, Users, Search, Bell, Radio } from 'lucide-react';
+import { Send, Sparkles, RefreshCw, CheckCircle, Clock, AlertCircle, Zap, Smartphone, Users, Search, Bell, Radio, Trash2, X } from 'lucide-react';
 
 interface NotificationAutomatorProps {
   notifications: NotificationLog[];
   students?: Student[];
   onAddNotification: (notification: Omit<NotificationLog, 'id' | 'timestamp' | 'status'>) => void;
+  onDeleteAllNotifications?: () => void;
 }
 
 export default function NotificationAutomator({
   notifications,
   students = [],
-  onAddNotification
+  onAddNotification,
+  onDeleteAllNotifications
 }: NotificationAutomatorProps) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   // Notification form states
   const [reason, setReason] = useState('Heavy Thunderstorms (Practice Cancelled)');
   const [recipientGroup, setRecipientGroup] = useState('All Parents');
@@ -417,7 +420,23 @@ export default function NotificationAutomator({
 
       {/* Broadcast logs feed list */}
       <div className="p-6 bg-white border border-gray-100 rounded-2xl shadow-sm space-y-4" id="notifications-log-card">
-        <h3 className="font-bold text-gray-900 font-sans text-lg">Published App Broadcast History</h3>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+          <div>
+            <h3 className="font-bold text-gray-900 font-sans text-lg">Published App Broadcast History ({notifications.length})</h3>
+            <p className="text-xs text-gray-500">History of all published push alerts sent to mobile app users.</p>
+          </div>
+
+          {onDeleteAllNotifications && notifications.length > 0 && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+              id="delete-all-notifications-btn"
+            >
+              <Trash2 size={14} />
+              Delete All Notifications
+            </button>
+          )}
+        </div>
         
         <div className="space-y-3" id="broadcast-history-list">
           {notifications.length > 0 ? (
@@ -451,6 +470,57 @@ export default function NotificationAutomator({
           )}
         </div>
       </div>
+
+      {/* Delete All Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl relative border border-rose-100">
+            <button 
+              onClick={() => setShowDeleteConfirm(false)}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-rose-100 text-rose-700 rounded-2xl shrink-0">
+                <AlertCircle size={28} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-gray-900">Delete All Notifications?</h3>
+                <p className="text-xs text-gray-500">Admin Portal Broadcast Clear</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-600 leading-relaxed bg-rose-50/50 p-3.5 rounded-xl border border-rose-100">
+              Are you sure you want to permanently delete all <strong>{notifications.length}</strong> previous notification broadcast logs from the application and cloud database? This action cannot be undone.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteAllNotifications) {
+                    onDeleteAllNotifications();
+                  }
+                  setShowDeleteConfirm(false);
+                }}
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer"
+              >
+                <Trash2 size={14} />
+                Yes, Delete All Notifications
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

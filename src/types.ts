@@ -16,6 +16,17 @@ export interface Student {
   registrationDate: string;
   photoUrl?: string;
   status: 'Active' | 'Inactive';
+  aadharNumber: string; // Mandatory Student/Guardian Aadhar No
+  isGuardianAadhar?: boolean; // True if child is under 5 years old
+}
+
+export interface DeletedStudentRecord {
+  id: string;
+  student: Student;
+  deletedAt: string;
+  deletedBy?: string;
+  feesHistory: FeeStatus[];
+  metricsHistory?: PerformanceMetric[];
 }
 
 export interface PerformanceMetric {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Student, PerformanceMetric } from '../types';
+import { db } from '../utils/db';
 import logo from '../assets/images/kssb_fc_official_logo.jpg';
 import { UserPlus, FileSpreadsheet, Search, Check, AlertCircle, Sparkles, X, Edit3, Phone, MapPin, User, ShieldCheck, Camera, Trash2, IdCard } from 'lucide-react';
 import PlayerIDCardModal from './PlayerIDCardModal';
@@ -50,6 +51,7 @@ export default function RosterManagement({
   const [regAge, setRegAge] = useState(14);
   const [regParentEmail, setRegParentEmail] = useState('');
   const [regPhotoUrl, setRegPhotoUrl] = useState<string>('');
+  const [regAadharNumber, setRegAadharNumber] = useState('');
 
   // Daily Metric Form State
   const [metricDate, setMetricDate] = useState(new Date().toISOString().split('T')[0]);
@@ -69,9 +71,8 @@ export default function RosterManagement({
   // Notification Banner State
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Next registration number preview
-  const nextRegIndex = students.length + 1;
-  const nextRegFormatted = `KSSBFC${String(nextRegIndex).padStart(4, '0')}/26-27`;
+  // Next sequential registration number calculation
+  const nextRegFormatted = db.getNextRegistrationNumber();
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +81,31 @@ export default function RosterManagement({
       return;
     }
 
-    const regNum = `KSSBFC${String(students.length + 1).padStart(4, '0')}/26-27`;
+    if (!regAadharNumber || regAadharNumber.trim().length < 8) {
+      setAlert({ 
+        type: 'error', 
+        message: Number(regAge) < 5 
+          ? "Guardian's Aadhar Number is mandatory for players under 5 years old!" 
+          : "Student's Aadhar Number is mandatory for player registration!" 
+      });
+      return;
+    }
+
+    // Restrict duplicate entries (Aadhar, Mobile + Name, or Name + Father Name)
+    const duplicateError = db.checkDuplicateStudent({
+      aadharNumber: regAadharNumber,
+      mobileNo: regMobileNo,
+      name: regName,
+      fatherName: regFatherName
+    });
+
+    if (duplicateError) {
+      setAlert({ type: 'error', message: duplicateError });
+      return;
+    }
+
+    const regNum = db.getNextRegistrationNumber();
+    const isUnder5 = Number(regAge) < 5;
 
     const newStudentData = {
       registrationNumber: regNum,
@@ -97,7 +122,9 @@ export default function RosterManagement({
       parentEmail: regParentEmail || `${regName.toLowerCase().replace(/\s+/g, '.')}@kssbfc.org`,
       parentPhone: regMobileNo,
       photoUrl: regPhotoUrl || undefined,
-      status: 'Active' as const
+      status: 'Active' as const,
+      aadharNumber: regAadharNumber.trim(),
+      isGuardianAadhar: isUnder5
     };
 
     onAddStudent(newStudentData);
@@ -115,7 +142,7 @@ export default function RosterManagement({
 
     setAlert({ 
       type: 'success', 
-      message: `Successfully created Student Profile for ${regName} (${regNum})! Player ID Card auto-generated below.` 
+      message: `Successfully registered Student ${regName} (${regNum})! Aadhar No: ${regAadharNumber}` 
     });
 
     // Clear fields
@@ -126,6 +153,7 @@ export default function RosterManagement({
     setRegMobileNo('');
     setRegGuardianName('');
     setRegGuardianMobileNo('');
+    setRegAadharNumber('');
     setRegAge(14);
     setRegParentEmail('');
     setRegPhotoUrl('');
@@ -365,11 +393,37 @@ export default function RosterManagement({
                     type="number" 
                     value={regAge}
                     onChange={(e) => setRegAge(Number(e.target.value))}
-                    min={5}
+                    min={2}
                     max={25}
                     className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
                     required
                   />
+                </div>
+
+                {/* Mandatory Aadhar No Field (Conditional Student vs Guardian) */}
+                <div className="space-y-1 col-span-1 sm:col-span-2 p-3 bg-amber-50/60 border border-amber-200 rounded-2xl">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] sm:text-xs font-mono font-bold text-amber-950 uppercase tracking-wide flex items-center gap-1.5">
+                      <IdCard size={15} className="text-amber-700" />
+                      {regAge < 5 ? "Guardian's Aadhar Number *" : "Student's Aadhar Number *"}
+                    </label>
+                    <span className="px-2 py-0.5 bg-amber-200 text-amber-900 text-[9px] font-mono font-bold rounded">
+                      {regAge < 5 ? "Child < 5 Yrs (Guardian Aadhar)" : "12-Digit Mandatory"}
+                    </span>
+                  </div>
+                  <input 
+                    type="text" 
+                    value={regAadharNumber}
+                    onChange={(e) => setRegAadharNumber(e.target.value)}
+                    placeholder={regAge < 5 ? "Enter Guardian's 12-digit Aadhar No (e.g. 1234 5678 9012)" : "Enter Student's 12-digit Aadhar No (e.g. 1234 5678 9012)"}
+                    className="w-full px-3.5 py-2.5 bg-white border border-amber-300 rounded-xl text-xs font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                    required
+                  />
+                  <p className="text-[10px] text-amber-800 font-medium">
+                    {regAge < 5 
+                      ? "Child is below 5 years old. Guardian's 12-digit Aadhar card number is required." 
+                      : "Mandatory 12-digit Indian National Identity (Aadhar) card number for verification."}
+                  </p>
                 </div>
 
                 {/* Guardian Name */}

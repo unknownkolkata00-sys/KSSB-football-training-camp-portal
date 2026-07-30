@@ -1,8 +1,9 @@
-import { Student, PerformanceMetric, FeeStatus, Tournament, InjuryReport, NotificationLog, CoachEvaluation, GalleryImage, CampJersey, JerseyOrder } from '../types';
+import { DeletedStudentRecord, Student, PerformanceMetric, FeeStatus, Tournament, InjuryReport, NotificationLog, CoachEvaluation, GalleryImage, CampJersey, JerseyOrder } from '../types';
 
 // Storage keys
 const STORAGE_KEYS = {
   STUDENTS: 'ftc_students',
+  DELETED_STUDENTS: 'ftc_deleted_students',
   METRICS: 'ftc_metrics',
   FEES: 'ftc_fees',
   TOURNAMENTS: 'ftc_tournaments',
@@ -17,6 +18,8 @@ const STORAGE_KEYS = {
 // Initial Seed Data - Student list empty by default for Admin registration
 const SEED_STUDENTS: Student[] = [];
 
+const SEED_DELETED_STUDENTS: DeletedStudentRecord[] = [];
+
 const SEED_METRICS: PerformanceMetric[] = [];
 
 const SEED_FEES: FeeStatus[] = [];
@@ -25,7 +28,7 @@ const SEED_TOURNAMENTS: Tournament[] = [];
 
 const SEED_INJURIES: InjuryReport[] = [];
 
-const SEED_JERSEYS: CampJersey[] = [
+export const SEED_JERSEYS: CampJersey[] = [
   {
     id: 'j1',
     name: 'KSSB FC Official Camp Jersey 2026',
@@ -40,21 +43,9 @@ const SEED_JERSEYS: CampJersey[] = [
 
 const SEED_JERSEY_ORDERS: JerseyOrder[] = [];
 
-const SEED_NOTIFICATIONS: NotificationLog[] = [
-  { id: 'n1', title: 'Practice Cancellation - Thunderstorms', message: 'Hi Parents, due to active severe weather warnings and lightning, tonight\'s training session (July 16) is CANCELLED. Stay safe! - Coach Abedemi Faniyan', recipientGroup: 'All Parents', timestamp: '2026-07-16 16:30', method: 'Both', status: 'Delivered' },
-  { id: 'n2', title: 'Friendly Tournament Time Reschedule', message: 'Dear U14 Parents, our friendly departure time for July 12 has been shifted to 9:00 AM instead of 8:30 AM due to bus routing delays. See you at the hub! - Club Admin', recipientGroup: 'Under 14 Parents', timestamp: '2026-07-11 18:15', method: 'Email', status: 'Delivered' }
-];
+const SEED_NOTIFICATIONS: NotificationLog[] = [];
 
-const SEED_COACH_EVALS: CoachEvaluation[] = [
-  {
-    id: 'e1',
-    date: '2026-07-01',
-    sessionsCount: 12,
-    avgAttendance: 92,
-    overallRating: 4.8,
-    aiReport: '### KSSB FC Professional Coach Evaluation Report\n\n**Coach Profile:** Coach Abedemi Faniyan (Head Coach - U16)\n\n**Evaluation Period:** June 2026\n\n---\n\n### 📈 Quantitative Performance Summary\n- **Sessions Scheduled:** 12 sessions completed.\n- **Average Player Attendance:** 92.4% (Exemplary involvement)\n- **Student Growth Margin:** +14.2% average improvement across speed, agility, and stamina parameters.\n- **Overall Rating Score:** **4.8 / 5.0**\n\n### ⚽ Core Strengths\n1. **Technical Proficiency:** Drills focus highly on game-realistic transitions. Passing accuracy across the squad improved by an average of 1.1 points on our standard 1-10 rating scale.\n2. **Parent Engagement:** Implemented automated announcements effectively. Weather communication was proactive.\n3. **Safety Focus:** Quick action taken regarding Virgil van Dijk’s knee strain, coordinating directly with the team physiotherapist.\n\n### 💡 Recommendations & Action Plan\n- Introduce structured cool-down sessions of at least 15 minutes to minimize soft-tissue strain, especially with high-tempo training.\n- Incorporate tactical video analysis once per month for the defensive line to align offside trap movements.'
-  }
-];
+const SEED_COACH_EVALS: CoachEvaluation[] = [];
 
 const SEED_GALLERY: GalleryImage[] = [
   {
@@ -124,6 +115,77 @@ export function saveLocalStorageData<T>(key: string, data: T[]): void {
 }
 
 export const db = {
+  // Deleted Students Archive
+  getDeletedStudents: () => getLocalStorageData<DeletedStudentRecord>(STORAGE_KEYS.DELETED_STUDENTS, SEED_DELETED_STUDENTS),
+  saveDeletedStudents: (data: DeletedStudentRecord[]) => saveLocalStorageData(STORAGE_KEYS.DELETED_STUDENTS, data),
+  
+  getNextRegistrationNumber: (): string => {
+    const students = db.getStudents();
+    const deleted = db.getDeletedStudents();
+    const allRegs = [
+      ...students.map(s => s.registrationNumber),
+      ...deleted.map(d => d.student.registrationNumber)
+    ];
+
+    let maxNum = 0;
+    allRegs.forEach(reg => {
+      if (reg) {
+        const match = reg.match(/KSSBFC(\d+)\//i);
+        if (match && match[1]) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxNum) {
+            maxNum = num;
+          }
+        }
+      }
+    });
+
+    const totalRegistered = students.length + deleted.length;
+    const nextSeq = Math.max(maxNum + 1, totalRegistered + 1);
+    return `KSSBFC${String(nextSeq).padStart(4, '0')}/26-27`;
+  },
+
+  checkDuplicateStudent: (data: { aadharNumber?: string; mobileNo?: string; name?: string; fatherName?: string }) => {
+    const students = db.getStudents();
+    const deleted = db.getDeletedStudents();
+    const allStudents = [...students, ...deleted.map(d => d.student)];
+
+    const cleanAadhar = data.aadharNumber?.replace(/\s+/g, '').trim();
+    const cleanMobile = data.mobileNo?.replace(/\D/g, '').trim();
+    const cleanName = data.name?.trim().toLowerCase();
+    const cleanFatherName = data.fatherName?.trim().toLowerCase();
+
+    for (const existing of allStudents) {
+      // 1. Aadhar check
+      if (cleanAadhar && existing.aadharNumber) {
+        const existingAadhar = existing.aadharNumber.replace(/\s+/g, '').trim();
+        if (existingAadhar === cleanAadhar) {
+          return `Duplicate Entry Blocked: A player with Aadhar No. '${data.aadharNumber}' is already registered (${existing.name}, Reg No: ${existing.registrationNumber}).`;
+        }
+      }
+
+      // 2. Name + Mobile check
+      if (cleanName && cleanMobile) {
+        const existingName = existing.name?.trim().toLowerCase();
+        const existingMobile = existing.mobileNo?.replace(/\D/g, '').trim();
+        if (existingName === cleanName && existingMobile === cleanMobile) {
+          return `Duplicate Entry Blocked: Student '${existing.name}' with mobile '${existing.mobileNo}' is already registered (Reg No: ${existing.registrationNumber}).`;
+        }
+      }
+
+      // 3. Name + Father Name check
+      if (cleanName && cleanFatherName) {
+        const existingName = existing.name?.trim().toLowerCase();
+        const existingFather = existing.fatherName?.trim().toLowerCase();
+        if (existingName === cleanName && existingFather === cleanFatherName) {
+          return `Duplicate Entry Blocked: Student '${existing.name}' (Father: ${existing.fatherName}) is already registered (Reg No: ${existing.registrationNumber}).`;
+        }
+      }
+    }
+
+    return null;
+  },
+
   // Students
   getStudents: () => {
     const raw = getLocalStorageData<Student>(STORAGE_KEYS.STUDENTS, SEED_STUDENTS);
@@ -137,20 +199,20 @@ export const db = {
   saveStudents: (data: Student[]) => saveLocalStorageData(STORAGE_KEYS.STUDENTS, data),
   addStudent: (student: Omit<Student, 'id' | 'registrationDate'>) => {
     const students = db.getStudents();
-    const nextCount = students.length + 1;
-    const autoRegNum = `KSSBFC${String(nextCount).padStart(4, '0')}/26-27`;
+    const autoRegNum = db.getNextRegistrationNumber();
+    const totalCount = students.length + db.getDeletedStudents().length + 1;
     
     const newStudent: Student = {
       ...student,
-      registrationNumber: student.registrationNumber || autoRegNum,
-      id: 'p' + nextCount + '_' + Date.now(),
+      registrationNumber: autoRegNum,
+      id: 'p' + totalCount + '_' + Date.now(),
       registrationDate: new Date().toISOString().split('T')[0],
     };
     db.saveStudents([...students, newStudent]);
     // Create baseline fees (Registration Fee: Free for first 15 students under Inaugural Offer, otherwise ₹350)
     const currentMonth = "July 2026";
     const fees = db.getFees();
-    const isFirst15 = students.length < 15;
+    const isFirst15 = (students.length + db.getDeletedStudents().length) < 15;
     const todayStr = new Date().toISOString().split('T')[0];
     
     const f1: FeeStatus = {
@@ -162,7 +224,7 @@ export const db = {
       status: isFirst15 ? 'Paid' : 'Pending',
       paymentMethod: isFirst15 ? 'Inaugural Offer Waived (First 15 Students)' : undefined,
       paymentDate: isFirst15 ? todayStr : undefined,
-      receiptNumber: isFirst15 ? `KSSB-FREE-OFFER-${String(nextCount).padStart(2, '0')}` : undefined
+      receiptNumber: isFirst15 ? `KSSB-FREE-OFFER-${String(totalCount).padStart(2, '0')}` : undefined
     };
     const f2: FeeStatus = {
       id: 'f_mon_' + Date.now(),
@@ -179,13 +241,52 @@ export const db = {
     const students = db.getStudents();
     db.saveStudents(students.map(s => s.id === updated.id ? updated : s));
   },
-  deleteStudent: (id: string) => {
+  deleteStudent: (id: string, deletedBy = 'Admin') => {
     const students = db.getStudents();
+    const targetStudent = students.find(s => s.id === id);
+    if (!targetStudent) return null;
+
+    const allFees = db.getFees();
+    const studentFees = allFees.filter(f => f.studentId === id);
+    const allMetrics = db.getMetrics();
+    const studentMetrics = allMetrics.filter(m => m.studentId === id);
+
+    const deletedRecord: DeletedStudentRecord = {
+      id: 'del_' + id + '_' + Date.now(),
+      student: targetStudent,
+      deletedAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      deletedBy,
+      feesHistory: studentFees,
+      metricsHistory: studentMetrics
+    };
+
+    const currentDeleted = db.getDeletedStudents();
+    db.saveDeletedStudents([deletedRecord, ...currentDeleted]);
+
     db.saveStudents(students.filter(s => s.id !== id));
+    db.saveFees(allFees.filter(f => f.studentId !== id));
+    db.saveMetrics(allMetrics.filter(m => m.studentId !== id));
+
+    return deletedRecord;
+  },
+  restoreDeletedStudent: (recordId: string) => {
+    const deletedRecords = db.getDeletedStudents();
+    const targetRecord = deletedRecords.find(d => d.id === recordId);
+    if (!targetRecord) return null;
+
+    const students = db.getStudents();
+    db.saveStudents([...students, targetRecord.student]);
+
     const fees = db.getFees();
-    db.saveFees(fees.filter(f => f.studentId !== id));
-    const metrics = db.getMetrics();
-    db.saveMetrics(metrics.filter(m => m.studentId !== id));
+    db.saveFees([...fees, ...targetRecord.feesHistory]);
+
+    if (targetRecord.metricsHistory && targetRecord.metricsHistory.length > 0) {
+      const metrics = db.getMetrics();
+      db.saveMetrics([...metrics, ...targetRecord.metricsHistory]);
+    }
+
+    db.saveDeletedStudents(deletedRecords.filter(d => d.id !== recordId));
+    return targetRecord;
   },
 
   // Metrics
@@ -330,6 +431,9 @@ export const db = {
     db.saveNotifications(updated);
     return updated;
   },
+  clearAllNotifications: () => {
+    saveLocalStorageData(STORAGE_KEYS.NOTIFICATIONS, []);
+  },
 
   // Coach Evaluations
   getEvaluations: () => getLocalStorageData<CoachEvaluation>(STORAGE_KEYS.COACH_EVALS, SEED_COACH_EVALS),
@@ -416,6 +520,18 @@ export const db = {
   updateJerseyOrder: (updated: JerseyOrder) => {
     const orders = db.getJerseyOrders();
     db.saveJerseyOrders(orders.map(o => o.id === updated.id ? updated : o));
+  },
+
+  clearAllAppDataExceptGallery: () => {
+    db.saveStudents([]);
+    db.saveDeletedStudents([]);
+    db.saveMetrics([]);
+    db.saveFees([]);
+    db.saveTournaments([]);
+    db.saveInjuries([]);
+    db.saveNotifications([]);
+    db.saveEvaluations([]);
+    db.saveJerseyOrders([]);
   }
 };
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from './utils/db';
+import { db, SEED_JERSEYS } from './utils/db';
 import { 
   subscribeStudents, 
   subscribeMetrics, 
@@ -11,6 +11,7 @@ import {
   subscribeGallery,
   subscribeJerseys,
   subscribeJerseyOrders,
+  subscribeDeletedStudents,
   saveStudentToCloud,
   saveMetricToCloud,
   saveFeeToCloud,
@@ -22,10 +23,15 @@ import {
   deleteGalleryImageFromCloud,
   deleteStudentFromCloud,
   saveJerseyToCloud,
+  deleteJerseyFromCloud,
   saveJerseyOrderToCloud,
+  saveDeletedStudentToCloud,
+  removeDeletedStudentFromCloud,
+  deleteAllNotificationsFromCloud,
+  clearAllDataExceptGalleryFromCloud,
   seedInitialCloudDataIfEmpty
 } from './utils/firebase';
-import { Student, PerformanceMetric, FeeStatus, Tournament, InjuryReport, NotificationLog, CoachEvaluation, GalleryImage, CampJersey, JerseyOrder } from './types';
+import { Student, PerformanceMetric, FeeStatus, Tournament, InjuryReport, NotificationLog, CoachEvaluation, GalleryImage, CampJersey, JerseyOrder, DeletedStudentRecord } from './types';
 import DashboardOverview from './components/DashboardOverview';
 import RosterManagement from './components/RosterManagement';
 import PlayerPerformanceView from './components/PlayerPerformanceView';
@@ -38,6 +44,7 @@ import CoachPerformance from './components/CoachPerformance';
 import CoachPortal from './components/CoachPortal';
 import StudentPortal from './components/StudentPortal';
 import JerseyStoreManager from './components/JerseyStoreManager';
+import DeletedStudentsView from './components/DeletedStudentsView';
 import Login from './components/Login';
 import AndroidAppModal from './components/AndroidAppModal';
 import { downloadAttendanceReportCSV, downloadFeesReportCSV } from './utils/reports';
@@ -65,7 +72,11 @@ import {
   ArrowLeft,
   Camera,
   Shirt,
-  ShoppingBag
+  ShoppingBag,
+  UserX,
+  Trash2,
+  AlertCircle,
+  CheckCircle
 } from 'lucide-react';
 
 
@@ -83,6 +94,8 @@ export default function App() {
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
   const [jerseys, setJerseys] = useState<CampJersey[]>([]);
   const [jerseyOrders, setJerseyOrders] = useState<JerseyOrder[]>([]);
+  const [deletedStudents, setDeletedStudents] = useState<DeletedStudentRecord[]>([]);
+  const [showResetConfirmModal, setShowResetConfirmModal] = useState<boolean>(false);
 
   // Authentication & Role State with LocalStorage Persistence
 
@@ -150,6 +163,13 @@ export default function App() {
 
   // Load baseline & Subscribe to real-time Firestore multi-handset updates
   useEffect(() => {
+    // 0. Auto-purge previous test data on request (Keep Gallery intact)
+    if (!localStorage.getItem('kssbfc_fresh_clean_app_v3')) {
+      db.clearAllAppDataExceptGallery();
+      clearAllDataExceptGalleryFromCloud();
+      localStorage.setItem('kssbfc_fresh_clean_app_v3', 'true');
+    }
+
     // 1. Initial Local Backup Load
     const loadedStudents = db.getStudents();
     setStudents(loadedStudents);
@@ -165,6 +185,7 @@ export default function App() {
     setGalleryImages(initialGallery);
     setJerseys(db.getJerseys());
     setJerseyOrders(db.getJerseyOrders());
+    setDeletedStudents(db.getDeletedStudents());
 
     if (loadedStudents.length > 0 && !loggedInStudentId) {
       setLoggedInStudentId(loadedStudents[0].id);
@@ -172,7 +193,7 @@ export default function App() {
 
 
     // 2. Seed default cloud records if cloud database is empty
-    seedInitialCloudDataIfEmpty(initialNotis, initialEvals, initialGallery);
+    seedInitialCloudDataIfEmpty(initialNotis, initialEvals, initialGallery, SEED_JERSEYS);
 
     // 3. Real-time Firebase Firestore subscriptions for Multi-Handset Live Sync
     const unsubStudents = subscribeStudents((cloudStudents) => {
@@ -239,15 +260,35 @@ export default function App() {
     });
 
     const unsubJerseys = subscribeJerseys((cloudJerseys) => {
-      if (cloudJerseys.length > 0) {
-        setJerseys(cloudJerseys);
-        db.saveJerseys(cloudJerseys);
-      }
+      const localJerseys = db.getJerseys();
+      const cloudIds = new Set(cloudJerseys.map(j => j.id));
+      
+      // Push local items to cloud if missing
+      localJerseys.forEach(localItem => {
+        if (!cloudIds.has(localItem.id)) {
+          saveJerseyToCloud(localItem);
+        }
+      });
+
+      const map = new Map<string, CampJersey>();
+      cloudJerseys.forEach(j => map.set(j.id, j));
+      localJerseys.forEach(j => {
+        if (!map.has(j.id)) map.set(j.id, j);
+      });
+
+      const mergedList = Array.from(map.values());
+      setJerseys(mergedList);
+      db.saveJerseys(mergedList);
     });
 
     const unsubJerseyOrders = subscribeJerseyOrders((cloudOrders) => {
       setJerseyOrders(cloudOrders);
       db.saveJerseyOrders(cloudOrders);
+    });
+
+    const unsubDeletedStudents = subscribeDeletedStudents((cloudDeleted) => {
+      setDeletedStudents(cloudDeleted);
+      db.saveDeletedStudents(cloudDeleted);
     });
 
     return () => {
@@ -261,6 +302,7 @@ export default function App() {
       unsubGallery();
       unsubJerseys();
       unsubJerseyOrders();
+      unsubDeletedStudents();
     };
 
   }, []);
@@ -282,11 +324,48 @@ export default function App() {
   };
 
   const handleDeleteStudent = (studentId: string) => {
-    db.deleteStudent(studentId);
+    const deletedRecord = db.deleteStudent(studentId);
     setStudents(db.getStudents());
     setFees(db.getFees());
     setMetrics(db.getMetrics());
+    setDeletedStudents(db.getDeletedStudents());
     deleteStudentFromCloud(studentId);
+    if (deletedRecord) {
+      saveDeletedStudentToCloud(deletedRecord);
+    }
+  };
+
+  const handleRestoreStudent = (recordId: string) => {
+    const restored = db.restoreDeletedStudent(recordId);
+    if (restored) {
+      setStudents(db.getStudents());
+      setFees(db.getFees());
+      setMetrics(db.getMetrics());
+      setDeletedStudents(db.getDeletedStudents());
+      saveStudentToCloud(restored.student);
+      restored.feesHistory.forEach(f => saveFeeToCloud(f));
+      removeDeletedStudentFromCloud(recordId);
+    }
+  };
+
+  const handleDeleteAllNotifications = () => {
+    db.clearAllNotifications();
+    setNotifications([]);
+    deleteAllNotificationsFromCloud();
+  };
+
+  const handleResetAllAppData = async () => {
+    db.clearAllAppDataExceptGallery();
+    setStudents([]);
+    setDeletedStudents([]);
+    setMetrics([]);
+    setFees([]);
+    setTournaments([]);
+    setInjuries([]);
+    setNotifications([]);
+    setEvaluations([]);
+    setJerseyOrders([]);
+    await clearAllDataExceptGalleryFromCloud();
   };
 
   const handleAddMetric = (metric: Omit<PerformanceMetric, 'id'>) => {
@@ -381,6 +460,7 @@ export default function App() {
   const handleDeleteJersey = (id: string) => {
     db.deleteJersey(id);
     setJerseys(db.getJerseys());
+    deleteJerseyFromCloud(id);
   };
 
   const handlePlaceJerseyOrder = (order: Omit<JerseyOrder, 'id' | 'orderDate'>) => {
@@ -440,7 +520,8 @@ export default function App() {
     { id: 'tournaments', label: 'Match Fixtures & Team Selection', icon: Trophy },
     { id: 'gallery', label: 'Photo Vault Gallery', icon: Camera },
     { id: 'notifications', label: 'Mobile App Push Alerts', icon: Send },
-    { id: 'evaluations', label: 'Coach Evaluations', icon: Award }
+    { id: 'evaluations', label: 'Coach Evaluations', icon: Award },
+    { id: 'deleted_history', label: 'Deleted Student History', icon: UserX }
   ];
 
 
@@ -625,6 +706,16 @@ export default function App() {
               >
                 <FileDown size={13} />
                 Master JSON Package
+              </button>
+
+              <button
+                onClick={() => setShowResetConfirmModal(true)}
+                className="w-full py-2 bg-rose-950/70 hover:bg-rose-900 text-rose-300 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-rose-800/80 mt-1"
+                title="Clear all previous records (Keep Gallery intact)"
+                id="reset-all-data-btn"
+              >
+                <Trash2 size={13} className="text-rose-400" />
+                Clear Data (Keep Gallery)
               </button>
             </div>
           )}
@@ -832,6 +923,7 @@ export default function App() {
                     notifications={notifications}
                     students={students}
                     onAddNotification={handleAddNotification}
+                    onDeleteAllNotifications={handleDeleteAllNotifications}
                   />
                 )}
 
@@ -839,6 +931,13 @@ export default function App() {
                   <CoachPerformance 
                     evaluations={evaluations}
                     onAddEvaluation={handleAddEvaluation}
+                  />
+                )}
+
+                {activeTab === 'deleted_history' && (
+                  <DeletedStudentsView 
+                    deletedRecords={deletedStudents}
+                    onRestoreStudent={handleRestoreStudent}
                   />
                 )}
               </>
@@ -890,6 +989,69 @@ export default function App() {
         isOpen={showAndroidModal} 
         onClose={() => setShowAndroidModal(false)} 
       />
+
+      {/* Fresh Reset Data Modal (Keep Gallery) */}
+      {showResetConfirmModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl relative border border-rose-100">
+            <button 
+              onClick={() => setShowResetConfirmModal(false)}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-rose-100 text-rose-700 rounded-2xl shrink-0">
+                <Trash2 size={28} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-gray-900">Clear Previous Data?</h3>
+                <p className="text-xs text-gray-500">KSSB FC Fresh Application Setup</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-rose-50/70 border border-rose-200 rounded-2xl text-xs text-rose-900 space-y-2">
+              <p className="font-bold flex items-center gap-1.5">
+                <AlertCircle size={15} className="text-rose-600 shrink-0" />
+                This will purge all previous test data:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-[11px] font-mono text-rose-800 pl-1">
+                <li>Students & Payment Ledgers</li>
+                <li>Jersey Orders</li>
+                <li>Performance Drills & Attendance</li>
+                <li>Fixtures, Injuries, Notifications, Evals</li>
+                <li>Deleted Student History</li>
+              </ul>
+              <div className="pt-2 border-t border-rose-200/80 font-bold text-emerald-800 flex items-center gap-1">
+                <CheckCircle size={14} className="text-emerald-600 shrink-0" />
+                <span>Gallery photos and jersey catalog will NOT be deleted!</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowResetConfirmModal(false)}
+                className="px-4 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await handleResetAllAppData();
+                  setShowResetConfirmModal(false);
+                }}
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer"
+              >
+                <Trash2 size={14} />
+                Yes, Clear All (Keep Gallery)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
