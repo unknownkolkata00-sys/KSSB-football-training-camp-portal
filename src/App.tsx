@@ -164,12 +164,8 @@ export default function App() {
 
   // Load baseline & Subscribe to real-time Firestore multi-handset updates
   useEffect(() => {
-    // 0. Auto-purge previous test data on request (Keep Gallery intact)
-    if (!localStorage.getItem('kssbfc_fresh_clean_app_v3')) {
-      db.clearAllAppDataExceptGallery();
-      clearAllDataExceptGalleryFromCloud();
-      localStorage.setItem('kssbfc_fresh_clean_app_v3', 'true');
-    }
+    // Ensure persistent storage indicator
+    localStorage.setItem('kssbfc_persistent_store_active', 'true');
 
     // 1. Initial Local Backup Load
     const loadedStudents = db.getStudents();

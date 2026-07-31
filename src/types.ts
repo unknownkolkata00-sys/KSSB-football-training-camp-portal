@@ -10,6 +10,7 @@ export interface Student {
   guardianMobileNo: string;
   position: 'Goalkeeper' | 'Defence' | 'Midfield' | 'Forward' | 'Winger';
   age: number;
+  dob?: string; // Date of Birth e.g. "YYYY-MM-DD" or "DD/MM/YYYY"
   parentName: string;
   parentEmail: string;
   parentPhone: string;

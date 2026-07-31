@@ -6,6 +6,7 @@ import { UserPlus, FileSpreadsheet, Search, Check, AlertCircle, Sparkles, X, Edi
 import PlayerIDCardModal from './PlayerIDCardModal';
 import PassportPhotoCapture from './PassportPhotoCapture';
 import StudentAvatar from './StudentAvatar';
+import { calculateExactAge, formatDateToDDMMYYYY } from '../utils/dateUtils';
 
 interface RosterManagementProps {
   students: Student[];
@@ -50,6 +51,7 @@ export default function RosterManagement({
   const [regGuardianName, setRegGuardianName] = useState('');
   const [regGuardianMobileNo, setRegGuardianMobileNo] = useState('');
   const [regPosition, setRegPosition] = useState<'Goalkeeper' | 'Defence' | 'Midfield' | 'Forward' | 'Winger'>('Forward');
+  const [regDob, setRegDob] = useState('');
   const [regAge, setRegAge] = useState(14);
   const [regParentEmail, setRegParentEmail] = useState('');
   const [regPhotoUrl, setRegPhotoUrl] = useState<string>('');
@@ -128,6 +130,7 @@ export default function RosterManagement({
       guardianMobileNo: regGuardianMobileNo || regMobileNo,
       position: regPosition,
       age: Number(regAge),
+      dob: regDob || undefined,
       parentName: regFatherName || regGuardianName,
       parentEmail: regParentEmail || `${regName.toLowerCase().replace(/\s+/g, '.')}@kssbfc.org`,
       parentPhone: regMobileNo,
@@ -164,6 +167,7 @@ export default function RosterManagement({
     setRegGuardianName('');
     setRegGuardianMobileNo('');
     setRegAadharNumber('');
+    setRegDob('');
     setRegAge(14);
     setRegParentEmail('');
     setRegPhotoUrl('');
@@ -185,6 +189,9 @@ export default function RosterManagement({
     }
 
     onUpdateStudent(editingStudent);
+    if (idCardStudent && idCardStudent.id === editingStudent.id) {
+      setIdCardStudent(editingStudent);
+    }
     setAlert({ type: 'success', message: `Profile updated for ${editingStudent.name} (${editingStudent.registrationNumber})` });
     setShowEditForm(false);
     setEditingStudent(null);
@@ -329,11 +336,13 @@ export default function RosterManagement({
               </div>
 
               {/* Player Passport Photo Capture Component */}
-              <PassportPhotoCapture
-                currentPhotoUrl={regPhotoUrl}
-                onPhotoCaptured={(url) => setRegPhotoUrl(url)}
-                label="Player Passport Photo * (MANDATORY - Save Restricted Without Photo)"
-              />
+              <div className="mt-5 mb-3 pt-1">
+                <PassportPhotoCapture
+                  currentPhotoUrl={regPhotoUrl}
+                  onPhotoCaptured={(url) => setRegPhotoUrl(url)}
+                  label="Player Passport Photo * (MANDATORY - Save Restricted Without Photo)"
+                />
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
                 
@@ -404,9 +413,36 @@ export default function RosterManagement({
                   />
                 </div>
 
+                {/* Date of Birth */}
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">
+                    Date of Birth (DD/MM/YYYY)
+                  </label>
+                  <input 
+                    type="date" 
+                    value={regDob}
+                    onChange={(e) => {
+                      const dobVal = e.target.value;
+                      setRegDob(dobVal);
+                      if (dobVal) {
+                        const computed = calculateExactAge(dobVal, regAge);
+                        if (computed.years >= 0) {
+                          setRegAge(computed.years);
+                        }
+                      }
+                    }}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+                  />
+                  {regDob && (
+                    <p className="text-[10px] text-emerald-700 font-bold mt-0.5">
+                      Exact Age: {calculateExactAge(regDob, regAge).displayText} (Auto-updates with days pass)
+                    </p>
+                  )}
+                </div>
+
                 {/* Age */}
                 <div className="space-y-1 col-span-1">
-                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Age *</label>
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Age (Years) *</label>
                   <input 
                     type="number" 
                     value={regAge}
@@ -594,7 +630,30 @@ export default function RosterManagement({
                 </div>
 
                 <div className="space-y-1 col-span-1">
-                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Age</label>
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Date of Birth (DD/MM/YYYY)</label>
+                  <input 
+                    type="date" 
+                    value={editingStudent.dob || ''}
+                    onChange={(e) => {
+                      const dobVal = e.target.value;
+                      const computed = calculateExactAge(dobVal, editingStudent.age);
+                      setEditingStudent({ 
+                        ...editingStudent, 
+                        dob: dobVal,
+                        age: computed.years >= 0 ? computed.years : editingStudent.age 
+                      });
+                    }}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold"
+                  />
+                  {editingStudent.dob && (
+                    <p className="text-[10px] text-emerald-700 font-bold mt-0.5">
+                      Exact Age: {calculateExactAge(editingStudent.dob, editingStudent.age).displayText}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1 col-span-1">
+                  <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Age (Years)</label>
                   <input 
                     type="number" 
                     value={editingStudent.age}
@@ -824,10 +883,10 @@ export default function RosterManagement({
                     <span className="font-bold text-gray-800">{student.fatherName || student.parentName || '—'}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-gray-400 font-mono uppercase block">WhatsApp Mobile</span>
-                    <a href={`tel:${student.mobileNo || student.parentPhone}`} className="font-mono font-bold text-emerald-700 underline">
-                      {student.mobileNo || student.parentPhone}
-                    </a>
+                    <span className="text-[10px] text-gray-400 font-mono uppercase block">DOB / Calculated Age</span>
+                    <span className="font-mono font-bold text-emerald-800">
+                      {student.dob ? `${formatDateToDDMMYYYY(student.dob)} (${calculateExactAge(student.dob, student.age).displayText})` : `${student.age} Yrs`}
+                    </span>
                   </div>
                 </div>
 
@@ -924,7 +983,14 @@ export default function RosterManagement({
                       <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-50 text-emerald-900 border border-emerald-200 inline-block mb-1">
                         {student.position}
                       </span>
-                      <div className="text-[11px] text-gray-500 font-medium">{student.age} Years Old</div>
+                      <div className="text-[11px] text-gray-800 font-bold">
+                        Age: {calculateExactAge(student.dob, student.age).displayText}
+                      </div>
+                      {student.dob && (
+                        <div className="text-[10px] font-mono text-gray-500">
+                          DOB: {formatDateToDDMMYYYY(student.dob)}
+                        </div>
+                      )}
                     </td>
                     <td className="p-4 text-xs">
                       <div className="font-bold text-gray-800 flex items-center gap-1">
@@ -1017,7 +1083,7 @@ export default function RosterManagement({
       <PlayerIDCardModal
         isOpen={showIdCardModal}
         onClose={() => setShowIdCardModal(false)}
-        student={idCardStudent}
+        student={idCardStudent ? (students.find(s => s.id === idCardStudent.id) || idCardStudent) : null}
         autoGeneratedNotice={isAutoGeneratedNotice}
       />
 
