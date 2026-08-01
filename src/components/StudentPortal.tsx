@@ -65,9 +65,13 @@ export default function StudentPortal({
   // Unread notification count for active student
   const unreadCount = notifications.filter(n => !(n.readBy || []).includes(student.id)).length;
 
-  // Filter student-specific records
+  // Filter student-specific records (Camp session starts August 2026)
   const studentMetrics = metrics.filter(m => m.studentId === student.id);
-  const studentFees = fees.filter(f => f.studentId === student.id);
+  const studentFees = fees.filter(f => 
+    f.studentId === student.id && 
+    f.month !== 'June 2026' && 
+    f.month !== 'July 2026'
+  );
 
   // Active undismissed notifications for alert banner
   const activeAlerts = notifications.filter(n => !dismissedNotiIds.includes(n.id));

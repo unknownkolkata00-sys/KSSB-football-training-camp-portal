@@ -138,8 +138,14 @@ export default function CoachPortal({
     setTimeout(() => setAlert(null), 5000);
   };
 
-  // Filter pending or overdue fees
-  const pendingOrOverdueFees = fees.filter(f => f.status === 'Pending' || f.status === 'Overdue');
+  // Filter pending or overdue fees starting from August 2026 onwards for active, non-deleted players
+  const activeStudentIds = new Set(students.filter(s => s.status !== 'Inactive').map(s => s.id));
+  const pendingOrOverdueFees = fees.filter(f => {
+    if (!activeStudentIds.has(f.studentId)) return false;
+    if (f.status !== 'Pending' && f.status !== 'Overdue') return false;
+    if (f.month === 'June 2026' || f.month === 'July 2026') return false;
+    return true;
+  });
 
   return (
     <div className="space-y-6" id="coach-portal-root">
