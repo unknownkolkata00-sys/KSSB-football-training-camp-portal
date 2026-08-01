@@ -49,7 +49,7 @@ export interface FeeStatus {
   id: string;
   studentId: string;
   feeType?: 'Registration' | 'Monthly';
-  month: string; // e.g. "Registration Fee" or "July 2026"
+  month: string; // e.g. "Registration Fee" or "August 2026"
   amount: number;
   status: 'Paid' | 'Pending' | 'Overdue';
   paymentDate?: string;

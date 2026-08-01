@@ -130,7 +130,7 @@ export default function CoachPerformance({
         <div className="p-4 bg-white border border-gray-100 rounded-xl shadow-sm space-y-1">
           <span className="text-[10px] font-mono text-gray-500 uppercase">Supervised Training Sessions</span>
           <div className="text-2xl font-bold text-gray-900">{sessionsCount} sessions</div>
-          <div className="text-[10px] text-emerald-600">June - July cycle</div>
+          <div className="text-[10px] text-emerald-600">August - December cycle</div>
         </div>
         <div className="p-4 bg-white border border-gray-100 rounded-xl shadow-sm space-y-1">
           <span className="text-[10px] font-mono text-gray-500 uppercase">Avg Squad Attendance</span>

@@ -211,7 +211,7 @@ export const db = {
     db.saveStudents([...students, newStudent]);
 
     // Create baseline fees (Registration Fee: Free for first 15 active students under Inaugural Offer, otherwise ₹350)
-    const currentMonth = "July 2026";
+    const currentMonth = "August 2026";
     const fees = db.getFees();
     // Active student count determines inaugural offer (first 15 active registered students)
     const isFirst15 = students.length < 15;
@@ -229,8 +229,8 @@ export const db = {
       receiptNumber: isFirst15 ? `KSSB-FREE-OFFER-${String(activeCount).padStart(2, '0')}` : undefined
     };
 
-    const initialMonths = ["June 2026", "July 2026", "August 2026", "September 2026"];
-    const monthFees: FeeStatus[] = initialMonths.map((mon, idx) => ({
+    const initialMonths = ["August 2026", "September 2026", "October 2026", "November 2026", "December 2026"];
+    const monthFees: FeeStatus[] = initialMonths.map((mon) => ({
       id: 'f_mon_' + mon.replace(/\s+/g, '').toLowerCase() + '_' + newStudent.id,
       studentId: newStudent.id,
       feeType: 'Monthly',
@@ -315,10 +315,17 @@ export const db = {
     const students = db.getStudents();
     const validStudentIds = new Set(students.map(s => s.id));
     
-    // Normalize existing fees: map "Admission Fee" to "Registration Fee"
+    // Normalize existing fees: remove June/July 2026, map "Admission Fee" to "Registration Fee"
     let modified = false;
     let normalized = raw
-      .filter(f => validStudentIds.has(f.studentId))
+      .filter(f => {
+        if (!validStudentIds.has(f.studentId)) return false;
+        if (f.month === 'June 2026' || f.month === 'July 2026') {
+          modified = true;
+          return false;
+        }
+        return true;
+      })
       .map(f => {
         if (f.month === 'Admission Fee') {
           modified = true;
@@ -334,8 +341,8 @@ export const db = {
         return f;
       });
 
-    // Ensure every active student has a Registration Fee record and Monthly Fee records for active months
-    const activeMonths = ["June 2026", "July 2026", "August 2026", "September 2026"];
+    // Ensure every active student has a Registration Fee record and Monthly Fee records for active months (Starting August 2026)
+    const activeMonths = ["August 2026", "September 2026", "October 2026", "November 2026", "December 2026"];
     students.forEach(student => {
       const hasRegFee = normalized.some(f => f.studentId === student.id && (f.feeType === 'Registration' || f.month.startsWith('Registration Fee')));
       if (!hasRegFee) {

@@ -479,14 +479,14 @@ export default function App() {
     if (role !== 'admin') return;
 
     const reportPayload = {
-      reportCycle: 'July 2026 Monthly Summary',
+      reportCycle: 'August 2026 Monthly Summary',
       exportedAt: new Date().toISOString(),
       statisticsSummary: {
         totalRegisteredAthletes: students.length,
         activeCampers: students.filter(s => s.status === 'Active').length,
         ongoingInjuries: injuries.filter(i => i.status !== 'Recovered').length,
-        totalTuitionsDue: fees.filter(f => f.month === 'July 2026').reduce((s, f) => s + f.amount, 0),
-        totalTuitionsCollected: fees.filter(f => f.month === 'July 2026' && f.status === 'Paid').reduce((s, f) => s + f.amount, 0)
+        totalTuitionsDue: fees.filter(f => f.month === 'August 2026').reduce((s, f) => s + f.amount, 0),
+        totalTuitionsCollected: fees.filter(f => f.month === 'August 2026' && f.status === 'Paid').reduce((s, f) => s + f.amount, 0)
       },
       datasets: {
         athletes: students,
@@ -502,7 +502,7 @@ export default function App() {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(reportPayload, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `KSSB_FC_Master_Report_July_2026.json`);
+    downloadAnchor.setAttribute("download", `KSSB_FC_Master_Report_August_2026.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -687,7 +687,7 @@ export default function App() {
               </button>
 
               <button
-                onClick={() => downloadFeesReportCSV(students, fees, 'July 2026')}
+                onClick={() => downloadFeesReportCSV(students, fees, 'August 2026')}
                 className="w-full py-2 bg-amber-950/80 hover:bg-amber-900 text-amber-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-amber-800/60"
                 title="Download Fees & Ledger CSV Report"
                 id="sidebar-fees-export-btn"

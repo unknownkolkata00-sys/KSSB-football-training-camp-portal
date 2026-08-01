@@ -26,7 +26,8 @@ export default function DashboardOverview({
   const activeFees = fees.filter(f => activeStudentIds.has(f.studentId));
 
   const regFees = activeFees.filter(f => f.feeType === 'Registration' || f.month.startsWith('Registration Fee'));
-  const monthlyFees = activeFees.filter(f => f.feeType !== 'Registration' && !f.month.startsWith('Registration Fee'));
+  const currentSessionMonth = "August 2026";
+  const monthlyFees = activeFees.filter(f => f.feeType !== 'Registration' && !f.month.startsWith('Registration Fee') && f.month === currentSessionMonth);
 
   const regCollected = regFees.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);
   const regPending = regFees.filter(f => f.status !== 'Paid').reduce((sum, f) => sum + f.amount, 0);
@@ -168,7 +169,7 @@ export default function DashboardOverview({
           </div>
           <div>
             <div className="text-2xl font-black text-indigo-900">₹{monthlyCollected}</div>
-            <span className="text-[10px] text-indigo-700 font-bold">₹150 / Month Training &rarr;</span>
+            <span className="text-[10px] text-indigo-700 font-bold">August 2026 Cycle &rarr;</span>
           </div>
         </div>
 
@@ -186,7 +187,7 @@ export default function DashboardOverview({
           </div>
           <div>
             <div className="text-2xl font-black text-rose-900">₹{monthlyPending}</div>
-            <span className="text-[10px] text-rose-700 font-bold">Outstanding Training Fees &rarr;</span>
+            <span className="text-[10px] text-rose-700 font-bold">August 2026 Outstanding &rarr;</span>
           </div>
         </div>
       </div>
@@ -239,7 +240,7 @@ export default function DashboardOverview({
               </div>
             </div>
             <button
-              onClick={() => downloadFeesReportCSV(students, fees, 'July 2026')}
+              onClick={() => downloadFeesReportCSV(students, fees, 'August 2026')}
               className="w-full py-2.5 px-4 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm border border-amber-400/30"
               id="download-fees-report-btn"
             >
