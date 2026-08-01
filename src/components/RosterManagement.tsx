@@ -289,7 +289,7 @@ export default function RosterManagement({
       {/* Register Student Modal Backdrop */}
       {showRegForm && userRole === 'admin' && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto transition-all" id="register-student-modal">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-4 sm:p-6 space-y-5 shadow-2xl relative my-6 border border-emerald-100">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-4 sm:p-6 space-y-5 shadow-2xl relative my-auto border border-emerald-100 max-h-[90vh] overflow-y-auto">
             <button 
               type="button"
               onClick={() => setShowRegForm(false)}
@@ -543,7 +543,7 @@ export default function RosterManagement({
       {/* Admin Edit Student Profile Modal */}
       {showEditForm && editingStudent && userRole === 'admin' && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto transition-all">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-4 sm:p-6 space-y-5 shadow-2xl relative my-6 border border-emerald-100">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-4 sm:p-6 space-y-5 shadow-2xl relative my-auto border border-emerald-100 max-h-[90vh] overflow-y-auto">
             <button 
               type="button"
               onClick={() => { setShowEditForm(false); setEditingStudent(null); }}
