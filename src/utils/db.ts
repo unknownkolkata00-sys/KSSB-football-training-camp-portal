@@ -1,4 +1,4 @@
-import { DeletedStudentRecord, Student, PerformanceMetric, FeeStatus, Tournament, InjuryReport, NotificationLog, CoachEvaluation, GalleryImage, CampJersey, JerseyOrder } from '../types';
+import { DeletedStudentRecord, Student, PerformanceMetric, FeeStatus, Tournament, InjuryReport, NotificationLog, CoachEvaluation, GalleryImage, CampJersey, JerseyOrder, CampAsset, CampExpense } from '../types';
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -12,7 +12,9 @@ const STORAGE_KEYS = {
   COACH_EVALS: 'ftc_coach_evals',
   GALLERY: 'ftc_gallery',
   JERSEYS: 'ftc_jerseys',
-  JERSEY_ORDERS: 'ftc_jersey_orders'
+  JERSEY_ORDERS: 'ftc_jersey_orders',
+  ASSETS: 'ftc_camp_assets',
+  EXPENSES: 'ftc_camp_expenses'
 };
 
 // Initial Seed Data - Student list empty by default for Admin registration
@@ -27,6 +29,142 @@ const SEED_FEES: FeeStatus[] = [];
 const SEED_TOURNAMENTS: Tournament[] = [];
 
 const SEED_INJURIES: InjuryReport[] = [];
+
+export const SEED_ASSETS: CampAsset[] = [
+  {
+    id: 'ast_1',
+    itemName: 'Agility Pole',
+    category: 'Fitness & Agility',
+    quantity: 12,
+    unit: 'pcs',
+    condition: 'Good',
+    storageLocation: 'Training Shed A',
+    estimatedCost: 3600,
+    purchasedDate: '2026-06-15',
+    notes: 'Yellow & Orange fluorescent slalom agility poles with spikes',
+    lastUpdated: '2026-08-01'
+  },
+  {
+    id: 'ast_2',
+    itemName: 'Marker Small',
+    category: 'Training Equipment',
+    quantity: 50,
+    unit: 'pcs',
+    condition: 'Good',
+    storageLocation: 'Equipment Bag 1',
+    estimatedCost: 1500,
+    purchasedDate: '2026-06-15',
+    notes: 'Multi-color disc markers for boundary and drill grids',
+    lastUpdated: '2026-08-01'
+  },
+  {
+    id: 'ast_3',
+    itemName: 'Marker Big',
+    category: 'Training Equipment',
+    quantity: 30,
+    unit: 'pcs',
+    condition: 'Good',
+    storageLocation: 'Equipment Bag 1',
+    estimatedCost: 1800,
+    purchasedDate: '2026-06-15',
+    notes: 'Tall dome saucers for position marking',
+    lastUpdated: '2026-08-01'
+  },
+  {
+    id: 'ast_4',
+    itemName: 'Cone Small',
+    category: 'Training Equipment',
+    quantity: 40,
+    unit: 'pcs',
+    condition: 'Good',
+    storageLocation: 'Equipment Bag 2',
+    estimatedCost: 1600,
+    purchasedDate: '2026-06-15',
+    notes: '9-inch training traffic cones',
+    lastUpdated: '2026-08-01'
+  },
+  {
+    id: 'ast_5',
+    itemName: 'Cone Big',
+    category: 'Training Equipment',
+    quantity: 20,
+    unit: 'pcs',
+    condition: 'Good',
+    storageLocation: 'Equipment Bag 2',
+    estimatedCost: 2000,
+    purchasedDate: '2026-06-15',
+    notes: '15-inch heavy-duty hurdle cones with slotted holes',
+    lastUpdated: '2026-08-01'
+  },
+  {
+    id: 'ast_6',
+    itemName: 'Pulling Band',
+    category: 'Fitness & Agility',
+    quantity: 15,
+    unit: 'pcs',
+    condition: 'Good',
+    storageLocation: 'Fitness Kit',
+    estimatedCost: 4500,
+    purchasedDate: '2026-06-20',
+    notes: 'Heavy resistance running bands with waist straps',
+    lastUpdated: '2026-08-01'
+  },
+  {
+    id: 'ast_7',
+    itemName: 'Moveable Goal Post',
+    category: 'Pitch & Goals',
+    quantity: 2,
+    unit: 'sets',
+    condition: 'Good',
+    storageLocation: 'Main Ground Pitch',
+    estimatedCost: 18000,
+    purchasedDate: '2026-05-10',
+    notes: 'Aluminum wheeled mini training goals with heavy netting (12x6 ft)',
+    lastUpdated: '2026-08-01'
+  }
+];
+
+export const SEED_EXPENSES: CampExpense[] = [
+  {
+    id: 'exp_1',
+    title: 'Ground Preparation & Grass Trimming',
+    category: 'Ground & Pitch Maintenance',
+    amount: 2500,
+    expenseDate: '2026-07-28',
+    paymentMode: 'Cash',
+    paidTo: 'Kadamtala Ground Caretaker Team',
+    billInvoiceNo: 'KSSB-EXP-001',
+    notes: 'Levelling, rolling, and line marking for inaugural camp launch',
+    loggedBy: 'Admin',
+    createdAt: '2026-07-28'
+  },
+  {
+    id: 'exp_2',
+    title: 'Camp First Aid Kit, Ice Packs & Pain Relief Spray',
+    category: 'Medical & First Aid',
+    amount: 1200,
+    expenseDate: '2026-08-02',
+    paymentMode: 'UPI / Online',
+    paidTo: 'City Care Pharmacy',
+    billInvoiceNo: 'INV-MED-4491',
+    notes: 'Crepe bandages, antiseptic spray, cold packs, medical tape',
+    loggedBy: 'Admin',
+    createdAt: '2026-08-02'
+  },
+  {
+    id: 'exp_3',
+    title: 'Practice Match Refreshments & Electrolyte Glucose',
+    category: 'Nutrition & Refreshments',
+    amount: 950,
+    expenseDate: '2026-08-08',
+    paymentMode: 'Cash',
+    paidTo: 'Shree Krishna Fruits & Grocery',
+    billInvoiceNo: 'BILL-8821',
+    notes: 'Bananas and Enerzal glucose hydration for all session players',
+    loggedBy: 'Admin',
+    createdAt: '2026-08-08'
+  }
+];
 
 export const SEED_JERSEYS: CampJersey[] = [
   {
@@ -197,7 +335,15 @@ export const db = {
     return cleaned;
   },
   saveStudents: (data: Student[]) => saveLocalStorageData(STORAGE_KEYS.STUDENTS, data),
-  addStudent: (student: Omit<Student, 'id' | 'registrationDate'>) => {
+  addStudent: (
+    student: Omit<Student, 'id' | 'registrationDate'>,
+    initialRegFeeConfig?: {
+      mode: 'Free' | 'Paid' | 'Pending';
+      freeCategory?: 'Special Child' | 'Members Child' | 'Coach Reference' | 'Members Reference' | 'Inaugural Free Offer';
+      paymentMethod?: string;
+      paymentDate?: string;
+    }
+  ) => {
     const students = db.getStudents();
     const autoRegNum = db.getNextRegistrationNumber();
     const activeCount = students.length + 1;
@@ -210,24 +356,71 @@ export const db = {
     };
     db.saveStudents([...students, newStudent]);
 
-    // Create baseline fees (Registration Fee: Free for first 15 active students under Inaugural Offer, otherwise ₹350)
-    const currentMonth = "August 2026";
+    // Create baseline fees
     const fees = db.getFees();
-    // Active student count determines inaugural offer (first 15 active registered students)
     const isFirst15 = students.length < 15;
     const todayStr = new Date().toISOString().split('T')[0];
     
-    const f1: FeeStatus = {
-      id: 'f_reg_' + Date.now(),
-      studentId: newStudent.id,
-      feeType: 'Registration',
-      month: isFirst15 ? 'Registration Fee (Inaugural Free Offer)' : 'Registration Fee',
-      amount: isFirst15 ? 0 : 350,
-      status: isFirst15 ? 'Paid' : 'Pending',
-      paymentMethod: isFirst15 ? 'Inaugural Offer Waived (First 15 Students)' : undefined,
-      paymentDate: isFirst15 ? todayStr : undefined,
-      receiptNumber: isFirst15 ? `KSSB-FREE-OFFER-${String(activeCount).padStart(2, '0')}` : undefined
-    };
+    let f1: FeeStatus;
+
+    if (initialRegFeeConfig) {
+      if (initialRegFeeConfig.mode === 'Free') {
+        const cat = initialRegFeeConfig.freeCategory || 'Special Child';
+        let recPrefix = 'KSSB-FREE-';
+        if (cat === 'Special Child') recPrefix = 'KSSB-FREE-SPECIAL-';
+        else if (cat === 'Members Child') recPrefix = 'KSSB-FREE-MEMBERS-';
+        else if (cat === 'Coach Reference') recPrefix = 'KSSB-FREE-COACH-';
+        else if (cat === 'Members Reference') recPrefix = 'KSSB-FREE-MEM-REF-';
+        else if (cat === 'Inaugural Free Offer') recPrefix = 'KSSB-FREE-OFFER-';
+
+        f1 = {
+          id: 'f_reg_' + Date.now(),
+          studentId: newStudent.id,
+          feeType: 'Registration',
+          month: `Registration Fee (${cat})`,
+          amount: 0,
+          status: 'Paid',
+          paymentMethod: `Waived - ${cat}`,
+          paymentDate: initialRegFeeConfig.paymentDate || todayStr,
+          receiptNumber: `${recPrefix}${String(activeCount).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`
+        };
+      } else if (initialRegFeeConfig.mode === 'Paid') {
+        f1 = {
+          id: 'f_reg_' + Date.now(),
+          studentId: newStudent.id,
+          feeType: 'Registration',
+          month: 'Registration Fee',
+          amount: 350,
+          status: 'Paid',
+          paymentMethod: initialRegFeeConfig.paymentMethod || 'Cash Handover',
+          paymentDate: initialRegFeeConfig.paymentDate || todayStr,
+          receiptNumber: `KSSB-REG-2026-${String(activeCount).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`
+        };
+      } else {
+        // Pending
+        f1 = {
+          id: 'f_reg_' + Date.now(),
+          studentId: newStudent.id,
+          feeType: 'Registration',
+          month: 'Registration Fee',
+          amount: 350,
+          status: 'Pending'
+        };
+      }
+    } else {
+      // Default fallback (first 15 free inaugural offer, otherwise standard pending ₹350)
+      f1 = {
+        id: 'f_reg_' + Date.now(),
+        studentId: newStudent.id,
+        feeType: 'Registration',
+        month: isFirst15 ? 'Registration Fee (Inaugural Free Offer)' : 'Registration Fee',
+        amount: isFirst15 ? 0 : 350,
+        status: isFirst15 ? 'Paid' : 'Pending',
+        paymentMethod: isFirst15 ? 'Inaugural Offer Waived (First 15 Students)' : undefined,
+        paymentDate: isFirst15 ? todayStr : undefined,
+        receiptNumber: isFirst15 ? `KSSB-FREE-OFFER-${String(activeCount).padStart(2, '0')}` : undefined
+      };
+    }
 
     const initialMonths = ["August 2026", "September 2026", "October 2026", "November 2026", "December 2026"];
     const monthFees: FeeStatus[] = initialMonths.map((mon) => ({
@@ -315,6 +508,20 @@ export const db = {
     const students = db.getStudents();
     const validStudentIds = new Set(students.map(s => s.id));
     
+    // Sort students by sequence (registration number or registration date)
+    const sortedStudents = [...students].sort((a, b) => {
+      if (a.registrationNumber && b.registrationNumber) {
+        const matchA = a.registrationNumber.match(/KSSBFC(\d+)\//i);
+        const matchB = b.registrationNumber.match(/KSSBFC(\d+)\//i);
+        if (matchA && matchB) {
+          return parseInt(matchA[1], 10) - parseInt(matchB[1], 10);
+        }
+      }
+      return (a.registrationDate || '').localeCompare(b.registrationDate || '');
+    });
+
+    const first15StudentIds = new Set(sortedStudents.slice(0, 15).map(s => s.id));
+
     // Normalize existing fees: remove June/July 2026, map "Admission Fee" to "Registration Fee"
     let modified = false;
     let normalized = raw
@@ -331,29 +538,56 @@ export const db = {
           modified = true;
           return { ...f, month: 'Registration Fee', feeType: 'Registration' as const };
         }
-        if (f.month === 'Registration Fee' && !f.feeType) {
+        if (f.month.startsWith('Registration Fee') && !f.feeType) {
           modified = true;
           return { ...f, feeType: 'Registration' as const };
         }
-        if (f.month !== 'Registration Fee' && !f.feeType) {
+        if (!f.month.startsWith('Registration Fee') && !f.feeType) {
           return { ...f, feeType: 'Monthly' as const };
         }
+
+        // Check if this student is beyond the first 15 students
+        const isRegistrationFee = f.feeType === 'Registration' || f.month.startsWith('Registration Fee');
+        if (isRegistrationFee) {
+          const isStudentInFirst15 = first15StudentIds.has(f.studentId);
+          // If student is NOT in the first 15, but has "Inaugural Free Offer", revert to standard ₹350
+          const isInauguralOffer = f.month.includes('Inaugural') || (f.paymentMethod && f.paymentMethod.includes('Inaugural'));
+          
+          if (!isStudentInFirst15 && isInauguralOffer) {
+            modified = true;
+            return {
+              ...f,
+              month: 'Registration Fee',
+              amount: 350,
+              status: 'Pending' as const,
+              paymentMethod: undefined,
+              paymentDate: undefined,
+              receiptNumber: undefined
+            };
+          }
+        }
+
         return f;
       });
 
     // Ensure every active student has a Registration Fee record and Monthly Fee records for active months (Starting August 2026)
     const activeMonths = ["August 2026", "September 2026", "October 2026", "November 2026", "December 2026"];
-    students.forEach(student => {
+    sortedStudents.forEach((student, idx) => {
+      const isFirst15 = idx < 15;
       const hasRegFee = normalized.some(f => f.studentId === student.id && (f.feeType === 'Registration' || f.month.startsWith('Registration Fee')));
       if (!hasRegFee) {
         modified = true;
+        const todayStr = new Date().toISOString().split('T')[0];
         normalized.push({
           id: 'f_reg_' + student.id + '_' + Date.now(),
           studentId: student.id,
           feeType: 'Registration',
-          month: 'Registration Fee',
-          amount: 350,
-          status: 'Pending'
+          month: isFirst15 ? 'Registration Fee (Inaugural Free Offer)' : 'Registration Fee',
+          amount: isFirst15 ? 0 : 350,
+          status: isFirst15 ? 'Paid' : 'Pending',
+          paymentMethod: isFirst15 ? 'Inaugural Offer Waived (First 15 Students)' : undefined,
+          paymentDate: isFirst15 ? (student.registrationDate || todayStr) : undefined,
+          receiptNumber: isFirst15 ? `KSSB-FREE-OFFER-${String(idx + 1).padStart(2, '0')}` : undefined
         });
       }
 
@@ -551,6 +785,56 @@ export const db = {
     db.saveJerseyOrders(orders.map(o => o.id === updated.id ? updated : o));
   },
 
+  // Camp Assets
+  getAssets: () => getLocalStorageData<CampAsset>(STORAGE_KEYS.ASSETS, SEED_ASSETS),
+  saveAssets: (data: CampAsset[]) => saveLocalStorageData(STORAGE_KEYS.ASSETS, data),
+  addAsset: (asset: Omit<CampAsset, 'id' | 'lastUpdated'>) => {
+    const assets = db.getAssets();
+    const newAsset: CampAsset = {
+      ...asset,
+      id: 'ast_' + Date.now(),
+      lastUpdated: new Date().toISOString().split('T')[0]
+    };
+    db.saveAssets([newAsset, ...assets]);
+    return newAsset;
+  },
+  updateAsset: (updated: CampAsset) => {
+    const assets = db.getAssets();
+    const withTimestamp = {
+      ...updated,
+      lastUpdated: new Date().toISOString().split('T')[0]
+    };
+    db.saveAssets(assets.map(a => a.id === updated.id ? withTimestamp : a));
+    return withTimestamp;
+  },
+  deleteAsset: (id: string) => {
+    const assets = db.getAssets();
+    db.saveAssets(assets.filter(a => a.id !== id));
+  },
+
+  // Camp Expenses
+  getExpenses: () => getLocalStorageData<CampExpense>(STORAGE_KEYS.EXPENSES, SEED_EXPENSES),
+  saveExpenses: (data: CampExpense[]) => saveLocalStorageData(STORAGE_KEYS.EXPENSES, data),
+  addExpense: (expense: Omit<CampExpense, 'id' | 'createdAt'>) => {
+    const expenses = db.getExpenses();
+    const newExpense: CampExpense = {
+      ...expense,
+      id: 'exp_' + Date.now(),
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+    db.saveExpenses([newExpense, ...expenses]);
+    return newExpense;
+  },
+  updateExpense: (updated: CampExpense) => {
+    const expenses = db.getExpenses();
+    db.saveExpenses(expenses.map(e => e.id === updated.id ? updated : e));
+    return updated;
+  },
+  deleteExpense: (id: string) => {
+    const expenses = db.getExpenses();
+    db.saveExpenses(expenses.filter(e => e.id !== id));
+  },
+
   clearAllAppDataExceptGallery: () => {
     db.saveStudents([]);
     db.saveDeletedStudents([]);
@@ -561,6 +845,8 @@ export const db = {
     db.saveNotifications([]);
     db.saveEvaluations([]);
     db.saveJerseyOrders([]);
+    db.saveAssets(SEED_ASSETS);
+    db.saveExpenses([]);
   }
 };
 

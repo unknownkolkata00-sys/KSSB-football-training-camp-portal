@@ -1,14 +1,16 @@
 import React from 'react';
-import { Student, PerformanceMetric, FeeStatus } from '../types';
-import { Users, CreditCard, Activity, CheckCircle, ArrowRight, Download, FileText, CalendarCheck, IndianRupee } from 'lucide-react';
+import { Student, PerformanceMetric, FeeStatus, CampAsset, CampExpense } from '../types';
+import { Users, CreditCard, Activity, CheckCircle, ArrowRight, Download, FileText, CalendarCheck, IndianRupee, Boxes, Receipt, Package, TrendingDown } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend } from 'recharts';
 import kssbFcLogo from '../assets/images/kssb_fc_official_logo.jpg';
-import { downloadAttendanceReportCSV, downloadFeesReportCSV } from '../utils/reports';
+import { downloadAttendanceReportCSV, downloadFeesReportCSV, downloadAssetsInventoryCSV, downloadExpensesReportCSV } from '../utils/reports';
 
 interface DashboardOverviewProps {
   students: Student[];
   metrics: PerformanceMetric[];
   fees: FeeStatus[];
+  assets?: CampAsset[];
+  expenses?: CampExpense[];
   setActiveTab: (tab: string) => void;
 }
 
@@ -16,6 +18,8 @@ export default function DashboardOverview({
   students,
   metrics,
   fees,
+  assets = [],
+  expenses = [],
   setActiveTab
 }: DashboardOverviewProps) {
   // Stats calculations
@@ -34,6 +38,11 @@ export default function DashboardOverview({
 
   const monthlyCollected = monthlyFees.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);
   const monthlyPending = monthlyFees.filter(f => f.status !== 'Paid').reduce((sum, f) => sum + f.amount, 0);
+
+  // Asset stats
+  const totalAssetItems = assets.reduce((sum, a) => sum + (Number(a.quantity) || 0), 0);
+  // Expense stats
+  const totalExpensesAmount = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
   // Calculate Average Team Attendance
   const recentDates = [...new Set(metrics.map(m => m.date))].sort().slice(-5);
@@ -192,6 +201,49 @@ export default function DashboardOverview({
         </div>
       </div>
 
+      {/* Quick Camp Asset & Financial Expenses Quick Panel */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4" id="camp-operations-quick-cards">
+        <div 
+          onClick={() => setActiveTab('assets')}
+          className="p-4 bg-gradient-to-r from-blue-900 to-indigo-950 text-white rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center justify-between border border-blue-800"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-blue-600/30 text-blue-300 rounded-xl border border-blue-500/30">
+              <Boxes size={24} />
+            </div>
+            <div>
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-blue-300">Inventory Management</span>
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                Camp Assets & Equipment 
+                <span className="px-2 py-0.5 bg-blue-500/30 rounded text-xs text-blue-200">{totalAssetItems} Units</span>
+              </h3>
+              <p className="text-xs text-blue-200/80">Track Poles, Cones, Markers, Pulling Bands, Moveable Goal Posts</p>
+            </div>
+          </div>
+          <ArrowRight size={18} className="text-blue-300 shrink-0" />
+        </div>
+
+        <div 
+          onClick={() => setActiveTab('expenses')}
+          className="p-4 bg-gradient-to-r from-emerald-950 to-teal-950 text-white rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center justify-between border border-teal-800"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-teal-600/30 text-teal-300 rounded-xl border border-teal-500/30">
+              <Receipt size={24} />
+            </div>
+            <div>
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-teal-300">Financial Accounts</span>
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                Camp Expense Register 
+                <span className="px-2 py-0.5 bg-rose-500/30 rounded text-xs text-rose-200">₹{totalExpensesAmount} Spent</span>
+              </h3>
+              <p className="text-xs text-teal-200/80">Ground rent, equipment, refreshments & matchday vouchers</p>
+            </div>
+          </div>
+          <ArrowRight size={18} className="text-teal-300 shrink-0" />
+        </div>
+      </div>
+
       {/* Admin Quick Report Downloads Bar */}
       <div className="p-5 bg-slate-900 border border-slate-800 rounded-2xl text-white space-y-4 shadow-md" id="admin-reports-download-card">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
@@ -205,46 +257,80 @@ export default function DashboardOverview({
           <p className="text-xs text-slate-400">Instantly generate spreadsheet-compatible CSV reports for administrative record-keeping.</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* Attendance Report Download Button */}
-          <div className="p-4 bg-slate-950/80 rounded-xl border border-slate-800 flex flex-col justify-between gap-3 hover:border-emerald-500/50 transition-all">
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1">
-                <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                  <CalendarCheck size={16} /> Attendance Report
-                </span>
-                <p className="text-xs text-slate-300">
-                  Includes full session history, athlete attendance rates (%), present/absent/excused counts, and coach notes.
-                </p>
-              </div>
+          <div className="p-3.5 bg-slate-950/80 rounded-xl border border-slate-800 flex flex-col justify-between gap-2.5 hover:border-emerald-500/50 transition-all">
+            <div className="space-y-1">
+              <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                <CalendarCheck size={15} /> Attendance Report
+              </span>
+              <p className="text-[11px] text-slate-300 leading-tight">
+                Athlete attendance rates (%), present/absent counts.
+              </p>
             </div>
             <button
               onClick={() => downloadAttendanceReportCSV(students, metrics)}
-              className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm border border-emerald-400/30"
+              className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm border border-emerald-400/30"
               id="download-attendance-report-btn"
             >
-              <Download size={15} /> Download Attendance Report (CSV)
+              <Download size={13} /> Attendance (CSV)
             </button>
           </div>
 
           {/* Fees Ledger Report Download Button */}
-          <div className="p-4 bg-slate-950/80 rounded-xl border border-slate-800 flex flex-col justify-between gap-3 hover:border-amber-500/50 transition-all">
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1">
-                <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                  <IndianRupee size={16} /> Fees & Tuition Ledger Report
-                </span>
-                <p className="text-xs text-slate-300">
-                  Includes athlete fee statuses (Paid, Pending, Overdue), amounts, settlement dates, payment methods, and parent contacts.
-                </p>
-              </div>
+          <div className="p-3.5 bg-slate-950/80 rounded-xl border border-slate-800 flex flex-col justify-between gap-2.5 hover:border-amber-500/50 transition-all">
+            <div className="space-y-1">
+              <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                <IndianRupee size={15} /> Fees & Tuition
+              </span>
+              <p className="text-[11px] text-slate-300 leading-tight">
+                Registration & monthly fees, settlements & contacts.
+              </p>
             </div>
             <button
               onClick={() => downloadFeesReportCSV(students, fees, 'August 2026')}
-              className="w-full py-2.5 px-4 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm border border-amber-400/30"
+              className="w-full py-2 px-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm border border-amber-400/30"
               id="download-fees-report-btn"
             >
-              <Download size={15} /> Download Fees Ledger Report (CSV)
+              <Download size={13} /> Fees Ledger (CSV)
+            </button>
+          </div>
+
+          {/* Assets Inventory Download Button */}
+          <div className="p-3.5 bg-slate-950/80 rounded-xl border border-slate-800 flex flex-col justify-between gap-2.5 hover:border-blue-500/50 transition-all">
+            <div className="space-y-1">
+              <span className="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                <Boxes size={15} /> Camp Assets
+              </span>
+              <p className="text-[11px] text-slate-300 leading-tight">
+                Equipment stock, quantities, conditions & storage.
+              </p>
+            </div>
+            <button
+              onClick={() => downloadAssetsInventoryCSV(assets)}
+              className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm border border-blue-400/30"
+              id="download-assets-report-btn"
+            >
+              <Download size={13} /> Assets (CSV)
+            </button>
+          </div>
+
+          {/* Expenses Download Button */}
+          <div className="p-3.5 bg-slate-950/80 rounded-xl border border-slate-800 flex flex-col justify-between gap-2.5 hover:border-rose-500/50 transition-all">
+            <div className="space-y-1">
+              <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+                <Receipt size={15} /> Camp Expenses
+              </span>
+              <p className="text-[11px] text-slate-300 leading-tight">
+                Financial accounts, expenses by category & payments.
+              </p>
+            </div>
+            <button
+              onClick={() => downloadExpensesReportCSV(expenses)}
+              className="w-full py-2 px-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm border border-rose-400/30"
+              id="download-expenses-report-btn"
+            >
+              <Download size={13} /> Expenses (CSV)
             </button>
           </div>
         </div>

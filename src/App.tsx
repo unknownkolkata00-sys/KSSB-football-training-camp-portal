@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db, SEED_JERSEYS } from './utils/db';
+import { db, SEED_JERSEYS, SEED_ASSETS, SEED_EXPENSES } from './utils/db';
 import { 
   subscribeStudents, 
   subscribeMetrics, 
@@ -12,6 +12,8 @@ import {
   subscribeJerseys,
   subscribeJerseyOrders,
   subscribeDeletedStudents,
+  subscribeCampAssets,
+  subscribeCampExpenses,
   saveStudentToCloud,
   saveMetricToCloud,
   saveFeeToCloud,
@@ -28,11 +30,15 @@ import {
   saveJerseyOrderToCloud,
   saveDeletedStudentToCloud,
   removeDeletedStudentFromCloud,
+  saveCampAssetToCloud,
+  deleteCampAssetFromCloud,
+  saveCampExpenseToCloud,
+  deleteCampExpenseFromCloud,
   deleteAllNotificationsFromCloud,
   clearAllDataExceptGalleryFromCloud,
   seedInitialCloudDataIfEmpty
 } from './utils/firebase';
-import { Student, PerformanceMetric, FeeStatus, Tournament, InjuryReport, NotificationLog, CoachEvaluation, GalleryImage, CampJersey, JerseyOrder, DeletedStudentRecord } from './types';
+import { Student, PerformanceMetric, FeeStatus, Tournament, InjuryReport, NotificationLog, CoachEvaluation, GalleryImage, CampJersey, JerseyOrder, DeletedStudentRecord, CampAsset, CampExpense } from './types';
 import DashboardOverview from './components/DashboardOverview';
 import RosterManagement from './components/RosterManagement';
 import PlayerPerformanceView from './components/PlayerPerformanceView';
@@ -46,9 +52,11 @@ import CoachPortal from './components/CoachPortal';
 import StudentPortal from './components/StudentPortal';
 import JerseyStoreManager from './components/JerseyStoreManager';
 import DeletedStudentsView from './components/DeletedStudentsView';
+import CampAssetManager from './components/CampAssetManager';
+import CampExpenseManager from './components/CampExpenseManager';
 import Login from './components/Login';
 import AndroidAppModal from './components/AndroidAppModal';
-import { downloadAttendanceReportCSV, downloadFeesReportCSV } from './utils/reports';
+import { downloadAttendanceReportCSV, downloadFeesReportCSV, downloadAssetsInventoryCSV, downloadExpensesReportCSV } from './utils/reports';
 import { AnimatePresence, motion } from 'motion/react';
 import kssbFcLogo from './assets/images/kssb_fc_official_logo.jpg';
 import { 
@@ -77,7 +85,10 @@ import {
   UserX,
   Trash2,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Boxes,
+  Receipt,
+  Wallet
 } from 'lucide-react';
 
 
@@ -96,6 +107,8 @@ export default function App() {
   const [jerseys, setJerseys] = useState<CampJersey[]>([]);
   const [jerseyOrders, setJerseyOrders] = useState<JerseyOrder[]>([]);
   const [deletedStudents, setDeletedStudents] = useState<DeletedStudentRecord[]>([]);
+  const [assets, setAssets] = useState<CampAsset[]>([]);
+  const [expenses, setExpenses] = useState<CampExpense[]>([]);
   const [showResetConfirmModal, setShowResetConfirmModal] = useState<boolean>(false);
 
   // Authentication & Role State with LocalStorage Persistence
@@ -183,6 +196,10 @@ export default function App() {
     setJerseys(db.getJerseys());
     setJerseyOrders(db.getJerseyOrders());
     setDeletedStudents(db.getDeletedStudents());
+    const initialAssets = db.getAssets();
+    setAssets(initialAssets);
+    const initialExpenses = db.getExpenses();
+    setExpenses(initialExpenses);
 
     if (loadedStudents.length > 0 && !loggedInStudentId) {
       setLoggedInStudentId(loadedStudents[0].id);
@@ -190,7 +207,7 @@ export default function App() {
 
 
     // 2. Seed default cloud records if cloud database is empty
-    seedInitialCloudDataIfEmpty(initialNotis, initialEvals, initialGallery, SEED_JERSEYS);
+    seedInitialCloudDataIfEmpty(initialNotis, initialEvals, initialGallery, SEED_JERSEYS, initialAssets, initialExpenses);
 
     // 3. Real-time Firebase Firestore subscriptions for Multi-Handset Live Sync
     const unsubStudents = subscribeStudents((cloudStudents) => {
@@ -288,6 +305,52 @@ export default function App() {
       db.saveDeletedStudents(cloudDeleted);
     });
 
+    const unsubAssets = subscribeCampAssets((cloudAssets) => {
+      const localAssets = db.getAssets();
+      const cloudIds = new Set(cloudAssets.map(a => a.id));
+      
+      // Push local items to cloud if missing
+      localAssets.forEach(localItem => {
+        if (!cloudIds.has(localItem.id)) {
+          saveCampAssetToCloud(localItem);
+        }
+      });
+
+      const map = new Map<string, CampAsset>();
+      cloudAssets.forEach(a => map.set(a.id, a));
+      localAssets.forEach(a => {
+        if (!map.has(a.id)) map.set(a.id, a);
+      });
+
+      const mergedList = Array.from(map.values());
+      setAssets(mergedList);
+      db.saveAssets(mergedList);
+    });
+
+    const unsubExpenses = subscribeCampExpenses((cloudExpenses) => {
+      const localExpenses = db.getExpenses();
+      const cloudIds = new Set(cloudExpenses.map(e => e.id));
+      
+      // Push local expenses to cloud if missing
+      localExpenses.forEach(localItem => {
+        if (!cloudIds.has(localItem.id)) {
+          saveCampExpenseToCloud(localItem);
+        }
+      });
+
+      const map = new Map<string, CampExpense>();
+      cloudExpenses.forEach(e => map.set(e.id, e));
+      localExpenses.forEach(e => {
+        if (!map.has(e.id)) map.set(e.id, e);
+      });
+
+      const mergedList = Array.from(map.values()).sort(
+        (a, b) => new Date(b.expenseDate || '').getTime() - new Date(a.expenseDate || '').getTime()
+      );
+      setExpenses(mergedList);
+      db.saveExpenses(mergedList);
+    });
+
     return () => {
       unsubStudents();
       unsubMetrics();
@@ -300,13 +363,23 @@ export default function App() {
       unsubJerseys();
       unsubJerseyOrders();
       unsubDeletedStudents();
+      unsubAssets();
+      unsubExpenses();
     };
 
   }, []);
 
   // Sync state helpers with Dual Persistence (Local DB + Cloud Firestore)
-  const handleAddStudent = (student: Omit<Student, 'id' | 'registrationDate'>) => {
-    const { newStudent, newFees } = db.addStudent(student);
+  const handleAddStudent = (
+    student: Omit<Student, 'id' | 'registrationDate'>,
+    initialRegFeeConfig?: {
+      mode: 'Free' | 'Paid' | 'Pending';
+      freeCategory?: 'Special Child' | 'Members Child' | 'Coach Reference' | 'Members Reference' | 'Inaugural Free Offer';
+      paymentMethod?: string;
+      paymentDate?: string;
+    }
+  ) => {
+    const { newStudent, newFees } = db.addStudent(student, initialRegFeeConfig);
     setStudents(db.getStudents());
     setFees(db.getFees());
     // Sync to Cloud Firestore
@@ -363,7 +436,45 @@ export default function App() {
     setNotifications([]);
     setEvaluations([]);
     setJerseyOrders([]);
+    setExpenses([]);
+    setAssets(SEED_ASSETS);
     await clearAllDataExceptGalleryFromCloud();
+  };
+
+  const handleAddAsset = (asset: Omit<CampAsset, 'id' | 'lastUpdated'>) => {
+    const newAsset = db.addAsset(asset);
+    setAssets(db.getAssets());
+    saveCampAssetToCloud(newAsset);
+  };
+
+  const handleUpdateAsset = (updated: CampAsset) => {
+    db.updateAsset(updated);
+    setAssets(db.getAssets());
+    saveCampAssetToCloud(updated);
+  };
+
+  const handleDeleteAsset = (id: string) => {
+    db.deleteAsset(id);
+    setAssets(db.getAssets());
+    deleteCampAssetFromCloud(id);
+  };
+
+  const handleAddExpense = (expense: Omit<CampExpense, 'id' | 'createdAt'>) => {
+    const newExpense = db.addExpense(expense);
+    setExpenses(db.getExpenses());
+    saveCampExpenseToCloud(newExpense);
+  };
+
+  const handleUpdateExpense = (updated: CampExpense) => {
+    db.updateExpense(updated);
+    setExpenses(db.getExpenses());
+    saveCampExpenseToCloud(updated);
+  };
+
+  const handleDeleteExpense = (id: string) => {
+    db.deleteExpense(id);
+    setExpenses(db.getExpenses());
+    deleteCampExpenseFromCloud(id);
   };
 
   const handleAddMetric = (metric: Omit<PerformanceMetric, 'id'>) => {
@@ -513,6 +624,8 @@ export default function App() {
     { id: 'dashboard', label: 'Overview Dashboard', icon: LayoutDashboard },
     { id: 'roster', label: 'New Registration & Roster', icon: Users },
     { id: 'fees', label: 'Fees Record (Ledger)', icon: CreditCard },
+    { id: 'assets', label: 'Camp Equipment & Assets', icon: Boxes },
+    { id: 'expenses', label: 'Camp Expenses & Accounts', icon: Receipt },
     { id: 'store', label: 'Camp Jersey Store & Orders', icon: Shirt },
     { id: 'performance', label: 'Attendance & Reviews', icon: Target },
     { id: 'tournaments', label: 'Match Fixtures & Team Selection', icon: Trophy },
@@ -697,6 +810,26 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => downloadAssetsInventoryCSV(assets)}
+                className="w-full py-2 bg-blue-950/80 hover:bg-blue-900 text-blue-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-blue-800/60"
+                title="Download Camp Inventory Assets Report"
+                id="sidebar-assets-export-btn"
+              >
+                <FileDown size={13} className="text-blue-400" />
+                Assets Inventory (CSV)
+              </button>
+
+              <button
+                onClick={() => downloadExpensesReportCSV(expenses)}
+                className="w-full py-2 bg-rose-950/80 hover:bg-rose-900 text-rose-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-rose-800/60"
+                title="Download Camp Expenses & Accounts Report"
+                id="sidebar-expenses-export-btn"
+              >
+                <FileDown size={13} className="text-rose-400" />
+                Expenses Ledger (CSV)
+              </button>
+
+              <button
                 onClick={triggerMasterExport}
                 className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-700"
                 title="Export Master Database Packages (JSON)"
@@ -841,6 +974,8 @@ export default function App() {
                     students={students}
                     metrics={metrics}
                     fees={fees}
+                    assets={assets}
+                    expenses={expenses}
                     setActiveTab={setActiveTab}
                   />
                 )}
@@ -849,6 +984,8 @@ export default function App() {
                   <RosterManagement 
                     students={students}
                     metrics={metrics}
+                    fees={fees}
+                    onUpdateFee={handleUpdateFee}
                     userRole={role}
                     onAddStudent={handleAddStudent}
                     onUpdateStudent={handleUpdateStudent}
@@ -871,6 +1008,25 @@ export default function App() {
                     fees={fees}
                     onUpdateFee={handleUpdateFee}
                     role="admin"
+                  />
+                )}
+
+                {activeTab === 'assets' && (
+                  <CampAssetManager
+                    assets={assets}
+                    onAddAsset={handleAddAsset}
+                    onUpdateAsset={handleUpdateAsset}
+                    onDeleteAsset={handleDeleteAsset}
+                  />
+                )}
+
+                {activeTab === 'expenses' && (
+                  <CampExpenseManager
+                    expenses={expenses}
+                    fees={fees}
+                    onAddExpense={handleAddExpense}
+                    onUpdateExpense={handleUpdateExpense}
+                    onDeleteExpense={handleDeleteExpense}
                   />
                 )}
 

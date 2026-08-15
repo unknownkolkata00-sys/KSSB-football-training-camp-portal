@@ -12,7 +12,7 @@ import {
   where
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { DeletedStudentRecord, Student, PerformanceMetric, FeeStatus, Tournament, InjuryReport, NotificationLog, CoachEvaluation, GalleryImage, CampJersey, JerseyOrder } from '../types';
+import { DeletedStudentRecord, Student, PerformanceMetric, FeeStatus, Tournament, InjuryReport, NotificationLog, CoachEvaluation, GalleryImage, CampJersey, JerseyOrder, CampAsset, CampExpense } from '../types';
 import { compressImageFile } from './imageCompressor';
 
 // Initialize Firebase App
@@ -35,8 +35,33 @@ const COLLECTIONS = {
   EVALUATIONS: 'coach_evaluations',
   GALLERY: 'gallery_images',
   JERSEYS: 'camp_jerseys',
-  JERSEY_ORDERS: 'jersey_orders'
+  JERSEY_ORDERS: 'jersey_orders',
+  ASSETS: 'camp_assets',
+  EXPENSES: 'camp_expenses'
 };
+
+/**
+ * Strips all undefined properties from an object recursively before saving to Firestore,
+ * completely preventing Firestore "Unsupported field value: undefined" errors.
+ */
+export function cleanDataForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return data.map(item => cleanDataForFirestore(item)) as unknown as T;
+  }
+  if (typeof data === 'object') {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data as Record<string, any>)) {
+      if (value !== undefined) {
+        cleaned[key] = cleanDataForFirestore(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return data;
+}
 
 
 /**
@@ -57,7 +82,7 @@ export function subscribeDeletedStudents(callback: (records: DeletedStudentRecor
 
 export async function saveDeletedStudentToCloud(record: DeletedStudentRecord) {
   try {
-    await setDoc(doc(firestoreDb, COLLECTIONS.DELETED_STUDENTS, record.id), record);
+    await setDoc(doc(firestoreDb, COLLECTIONS.DELETED_STUDENTS, record.id), cleanDataForFirestore(record));
   } catch (err) {
     console.error('Failed to save deleted student to Firestore:', err);
   }
@@ -102,7 +127,8 @@ export async function clearAllDataExceptGalleryFromCloud() {
     COLLECTIONS.INJURIES,
     COLLECTIONS.NOTIFICATIONS,
     COLLECTIONS.EVALUATIONS,
-    COLLECTIONS.JERSEY_ORDERS
+    COLLECTIONS.JERSEY_ORDERS,
+    COLLECTIONS.EXPENSES
   ];
 
   for (const colName of collectionsToClear) {
@@ -250,7 +276,7 @@ export async function saveStudentToCloud(student: Student) {
       const compressedPhoto = await compressImageFile(student.photoUrl, 500, 0.75, 300000);
       studentToSave = { ...student, photoUrl: compressedPhoto };
     }
-    await setDoc(doc(firestoreDb, COLLECTIONS.STUDENTS, studentToSave.id), studentToSave);
+    await setDoc(doc(firestoreDb, COLLECTIONS.STUDENTS, studentToSave.id), cleanDataForFirestore(studentToSave));
   } catch (err) {
     console.error('Failed to save student to Firestore:', err);
   }
@@ -266,7 +292,7 @@ export async function deleteStudentFromCloud(id: string) {
 
 export async function saveMetricToCloud(metric: PerformanceMetric) {
   try {
-    await setDoc(doc(firestoreDb, COLLECTIONS.METRICS, metric.id), metric);
+    await setDoc(doc(firestoreDb, COLLECTIONS.METRICS, metric.id), cleanDataForFirestore(metric));
   } catch (err) {
     console.error('Failed to save metric to Firestore:', err);
   }
@@ -274,7 +300,7 @@ export async function saveMetricToCloud(metric: PerformanceMetric) {
 
 export async function saveFeeToCloud(fee: FeeStatus) {
   try {
-    await setDoc(doc(firestoreDb, COLLECTIONS.FEES, fee.id), fee);
+    await setDoc(doc(firestoreDb, COLLECTIONS.FEES, fee.id), cleanDataForFirestore(fee));
   } catch (err) {
     console.error('Failed to save fee to Firestore:', err);
   }
@@ -293,7 +319,7 @@ export async function deleteStudentFeesFromCloud(studentId: string) {
 
 export async function saveTournamentToCloud(tournament: Tournament) {
   try {
-    await setDoc(doc(firestoreDb, COLLECTIONS.TOURNAMENTS, tournament.id), tournament);
+    await setDoc(doc(firestoreDb, COLLECTIONS.TOURNAMENTS, tournament.id), cleanDataForFirestore(tournament));
   } catch (err) {
     console.error('Failed to save tournament to Firestore:', err);
   }
@@ -301,7 +327,7 @@ export async function saveTournamentToCloud(tournament: Tournament) {
 
 export async function saveInjuryToCloud(injury: InjuryReport) {
   try {
-    await setDoc(doc(firestoreDb, COLLECTIONS.INJURIES, injury.id), injury);
+    await setDoc(doc(firestoreDb, COLLECTIONS.INJURIES, injury.id), cleanDataForFirestore(injury));
   } catch (err) {
     console.error('Failed to save injury to Firestore:', err);
   }
@@ -309,7 +335,7 @@ export async function saveInjuryToCloud(injury: InjuryReport) {
 
 export async function saveNotificationToCloud(noti: NotificationLog) {
   try {
-    await setDoc(doc(firestoreDb, COLLECTIONS.NOTIFICATIONS, noti.id), noti);
+    await setDoc(doc(firestoreDb, COLLECTIONS.NOTIFICATIONS, noti.id), cleanDataForFirestore(noti));
   } catch (err) {
     console.error('Failed to save notification to Firestore:', err);
   }
@@ -317,7 +343,7 @@ export async function saveNotificationToCloud(noti: NotificationLog) {
 
 export async function saveEvaluationToCloud(evalItem: CoachEvaluation) {
   try {
-    await setDoc(doc(firestoreDb, COLLECTIONS.EVALUATIONS, evalItem.id), evalItem);
+    await setDoc(doc(firestoreDb, COLLECTIONS.EVALUATIONS, evalItem.id), cleanDataForFirestore(evalItem));
   } catch (err) {
     console.error('Failed to save evaluation to Firestore:', err);
   }
@@ -330,7 +356,7 @@ export async function saveGalleryImageToCloud(image: GalleryImage) {
       const compressedUrl = await compressImageFile(image.imageUrl, 800, 0.75, 300000);
       imgToSave = { ...image, imageUrl: compressedUrl };
     }
-    await setDoc(doc(firestoreDb, COLLECTIONS.GALLERY, imgToSave.id), imgToSave);
+    await setDoc(doc(firestoreDb, COLLECTIONS.GALLERY, imgToSave.id), cleanDataForFirestore(imgToSave));
   } catch (err) {
     console.error('Failed to save gallery image to Firestore:', err);
   }
@@ -382,7 +408,7 @@ export async function saveJerseyToCloud(jersey: CampJersey) {
       const compressedUrl = await compressImageFile(jersey.imageUrl, 800, 0.75, 300000);
       jerseyToSave = { ...jersey, imageUrl: compressedUrl };
     }
-    await setDoc(doc(firestoreDb, COLLECTIONS.JERSEYS, jerseyToSave.id), jerseyToSave);
+    await setDoc(doc(firestoreDb, COLLECTIONS.JERSEYS, jerseyToSave.id), cleanDataForFirestore(jerseyToSave));
   } catch (err) {
     console.error('Failed to save jersey to Firestore:', err);
   }
@@ -398,28 +424,93 @@ export async function deleteJerseyFromCloud(id: string) {
 
 export async function saveJerseyOrderToCloud(order: JerseyOrder) {
   try {
-    await setDoc(doc(firestoreDb, COLLECTIONS.JERSEY_ORDERS, order.id), order);
+    await setDoc(doc(firestoreDb, COLLECTIONS.JERSEY_ORDERS, order.id), cleanDataForFirestore(order));
   } catch (err) {
     console.error('Failed to save jersey order to Firestore:', err);
   }
 }
 
+/**
+ * Real-time listener for Camp Assets
+ */
+export function subscribeCampAssets(callback: (assets: CampAsset[]) => void) {
+  return onSnapshot(collection(firestoreDb, COLLECTIONS.ASSETS), (snapshot) => {
+    const list: CampAsset[] = [];
+    snapshot.forEach((docSnap) => {
+      list.push({ ...docSnap.data(), id: docSnap.id } as CampAsset);
+    });
+    list.sort((a, b) => (a.itemName || '').localeCompare(b.itemName || ''));
+    callback(list);
+  }, (err) => {
+    console.error('Firestore assets snapshot error:', err);
+  });
+}
+
+export async function saveCampAssetToCloud(asset: CampAsset) {
+  try {
+    await setDoc(doc(firestoreDb, COLLECTIONS.ASSETS, asset.id), cleanDataForFirestore(asset));
+  } catch (err) {
+    console.error('Failed to save asset to Firestore:', err);
+  }
+}
+
+export async function deleteCampAssetFromCloud(id: string) {
+  try {
+    await deleteDoc(doc(firestoreDb, COLLECTIONS.ASSETS, id));
+  } catch (err) {
+    console.error('Failed to delete asset from Firestore:', err);
+  }
+}
 
 /**
- * Ensures initial local seed notifications, coach evals, gallery images, and jerseys exist in Firestore if cloud collection is empty.
+ * Real-time listener for Camp Expenses
+ */
+export function subscribeCampExpenses(callback: (expenses: CampExpense[]) => void) {
+  return onSnapshot(collection(firestoreDb, COLLECTIONS.EXPENSES), (snapshot) => {
+    const list: CampExpense[] = [];
+    snapshot.forEach((docSnap) => {
+      list.push({ ...docSnap.data(), id: docSnap.id } as CampExpense);
+    });
+    list.sort((a, b) => new Date(b.expenseDate || '').getTime() - new Date(a.expenseDate || '').getTime());
+    callback(list);
+  }, (err) => {
+    console.error('Firestore expenses snapshot error:', err);
+  });
+}
+
+export async function saveCampExpenseToCloud(expense: CampExpense) {
+  try {
+    await setDoc(doc(firestoreDb, COLLECTIONS.EXPENSES, expense.id), cleanDataForFirestore(expense));
+  } catch (err) {
+    console.error('Failed to save expense to Firestore:', err);
+  }
+}
+
+export async function deleteCampExpenseFromCloud(id: string) {
+  try {
+    await deleteDoc(doc(firestoreDb, COLLECTIONS.EXPENSES, id));
+  } catch (err) {
+    console.error('Failed to delete expense from Firestore:', err);
+  }
+}
+
+/**
+ * Ensures initial local seed notifications, coach evals, gallery images, jerseys, assets, and expenses exist in Firestore if cloud collection is empty.
  */
 export async function seedInitialCloudDataIfEmpty(
   seedNotifications: NotificationLog[],
   seedEvals: CoachEvaluation[],
   seedGallery: GalleryImage[] = [],
-  seedJerseys: CampJersey[] = []
+  seedJerseys: CampJersey[] = [],
+  seedAssets: CampAsset[] = [],
+  seedExpenses: CampExpense[] = []
 ) {
   try {
     const notiSnap = await getDocs(collection(firestoreDb, COLLECTIONS.NOTIFICATIONS));
     if (notiSnap.empty && seedNotifications.length > 0) {
       const batch = writeBatch(firestoreDb);
       seedNotifications.forEach(n => {
-        batch.set(doc(firestoreDb, COLLECTIONS.NOTIFICATIONS, n.id), n);
+        batch.set(doc(firestoreDb, COLLECTIONS.NOTIFICATIONS, n.id), cleanDataForFirestore(n));
       });
       await batch.commit();
     }
@@ -428,7 +519,7 @@ export async function seedInitialCloudDataIfEmpty(
     if (evalSnap.empty && seedEvals.length > 0) {
       const batch = writeBatch(firestoreDb);
       seedEvals.forEach(e => {
-        batch.set(doc(firestoreDb, COLLECTIONS.EVALUATIONS, e.id), e);
+        batch.set(doc(firestoreDb, COLLECTIONS.EVALUATIONS, e.id), cleanDataForFirestore(e));
       });
       await batch.commit();
     }
@@ -440,7 +531,7 @@ export async function seedInitialCloudDataIfEmpty(
       let needsCommit = false;
       seedGallery.forEach(g => {
         if (!existingCloudIds.has(g.id)) {
-          batch.set(doc(firestoreDb, COLLECTIONS.GALLERY, g.id), g);
+          batch.set(doc(firestoreDb, COLLECTIONS.GALLERY, g.id), cleanDataForFirestore(g));
           needsCommit = true;
         }
       });
@@ -456,7 +547,39 @@ export async function seedInitialCloudDataIfEmpty(
       let needsCommit = false;
       seedJerseys.forEach(j => {
         if (!existingCloudJerseyIds.has(j.id)) {
-          batch.set(doc(firestoreDb, COLLECTIONS.JERSEYS, j.id), j);
+          batch.set(doc(firestoreDb, COLLECTIONS.JERSEYS, j.id), cleanDataForFirestore(j));
+          needsCommit = true;
+        }
+      });
+      if (needsCommit) {
+        await batch.commit();
+      }
+    }
+
+    const assetSnap = await getDocs(collection(firestoreDb, COLLECTIONS.ASSETS));
+    const existingCloudAssetIds = new Set(assetSnap.docs.map(d => d.id));
+    if (seedAssets.length > 0) {
+      const batch = writeBatch(firestoreDb);
+      let needsCommit = false;
+      seedAssets.forEach(a => {
+        if (!existingCloudAssetIds.has(a.id)) {
+          batch.set(doc(firestoreDb, COLLECTIONS.ASSETS, a.id), cleanDataForFirestore(a));
+          needsCommit = true;
+        }
+      });
+      if (needsCommit) {
+        await batch.commit();
+      }
+    }
+
+    const expenseSnap = await getDocs(collection(firestoreDb, COLLECTIONS.EXPENSES));
+    const existingCloudExpenseIds = new Set(expenseSnap.docs.map(d => d.id));
+    if (seedExpenses.length > 0) {
+      const batch = writeBatch(firestoreDb);
+      let needsCommit = false;
+      seedExpenses.forEach(exp => {
+        if (!existingCloudExpenseIds.has(exp.id)) {
+          batch.set(doc(firestoreDb, COLLECTIONS.EXPENSES, exp.id), cleanDataForFirestore(exp));
           needsCommit = true;
         }
       });

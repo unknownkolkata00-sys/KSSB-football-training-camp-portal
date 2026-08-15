@@ -158,3 +158,32 @@ export interface JerseyOrder {
   mobileNo?: string;
   notes?: string;
 }
+
+export interface CampAsset {
+  id: string;
+  itemName: string;
+  category: 'Training Equipment' | 'Pitch & Goals' | 'Fitness & Agility' | 'Balls & Footwear' | 'First Aid & Safety' | 'General';
+  quantity: number;
+  unit?: string;
+  condition: 'Good' | 'Fair' | 'Needs Repair' | 'Needs Replacement';
+  storageLocation?: string;
+  purchasedDate?: string;
+  estimatedCost?: number;
+  notes?: string;
+  lastUpdated?: string;
+}
+
+export interface CampExpense {
+  id: string;
+  title: string;
+  category: 'Ground & Pitch Maintenance' | 'Equipment & Assets' | 'Coach & Staff Honorarium' | 'Nutrition & Refreshments' | 'Tournaments & Transport' | 'Medical & First Aid' | 'Office & Admin' | 'Miscellaneous';
+  amount: number;
+  expenseDate: string;
+  paymentMode: 'Cash' | 'UPI / Online' | 'Bank Transfer' | 'Debit/Credit Card' | 'Cheque';
+  paidTo: string;
+  billInvoiceNo?: string;
+  billReceiptImage?: string;
+  notes?: string;
+  loggedBy?: string;
+  createdAt?: string;
+}

@@ -1,4 +1,4 @@
-import { Student, PerformanceMetric, FeeStatus } from '../types';
+import { Student, PerformanceMetric, FeeStatus, CampAsset, CampExpense } from '../types';
 
 /**
  * Downloads a comprehensive CSV report for Camp Attendance.
@@ -131,8 +131,8 @@ export function downloadFeesReportCSV(students: Student[], fees: FeeStatus[], se
     ? fees.filter(f => f.month === selectedMonth) 
     : fees;
 
-  const regFees = filteredFees.filter(f => f.feeType === 'Registration' || f.month === 'Registration Fee');
-  const monthlyFees = filteredFees.filter(f => f.feeType !== 'Registration' && f.month !== 'Registration Fee');
+  const regFees = filteredFees.filter(f => f.feeType === 'Registration' || f.month.startsWith('Registration Fee'));
+  const monthlyFees = filteredFees.filter(f => f.feeType !== 'Registration' && !f.month.startsWith('Registration Fee'));
 
   const regCollected = regFees.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);
   const regPending = regFees.filter(f => f.status !== 'Paid').reduce((sum, f) => sum + f.amount, 0);
@@ -179,7 +179,8 @@ export function downloadFeesReportCSV(students: Student[], fees: FeeStatus[], se
 
   filteredFees.forEach(f => {
     const s = students.find(st => st.id === f.studentId);
-    const category = (f.feeType === 'Registration' || f.month === 'Registration Fee') ? 'Registration Fee (₹350 One-Time)' : 'Monthly Training Fee (₹150/mo)';
+    const isReg = f.feeType === 'Registration' || f.month.startsWith('Registration Fee');
+    const category = isReg ? (f.amount === 0 ? 'Registration Fee (FREE / Waived)' : 'Registration Fee (₹350 One-Time)') : 'Monthly Training Fee (₹150/mo)';
     lines.push([
       `"${category}"`,
       `"${f.month}"`,
@@ -203,6 +204,116 @@ export function downloadFeesReportCSV(students: Student[], fees: FeeStatus[], se
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = `KSSB_FC_Fees_Ledger_Report_${selectedMonth ? selectedMonth.replace(/\s+/g, '_') : 'All'}_${timestamp}.csv`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Downloads a comprehensive CSV report for Camp Assets & Inventory.
+ */
+export function downloadAssetsInventoryCSV(assets: CampAsset[]) {
+  const timestamp = new Date().toISOString().split('T')[0];
+  const totalUnits = assets.reduce((s, a) => s + (a.quantity || 0), 0);
+  const totalEstCost = assets.reduce((s, a) => s + (a.estimatedCost || 0), 0);
+
+  const lines: string[] = [];
+  lines.push(`"KADAMTALA SPORTING SUBHAS BHOWMICK FOOTBALL CLUB (KSSB FC)"`);
+  lines.push(`"CAMP ASSET & EQUIPMENT INVENTORY AUDIT REPORT"`);
+  lines.push(`"Generated On: ${new Date().toLocaleString()}"`);
+  lines.push(`"Total Distinct Items: ${assets.length}","Total Units In Stock: ${totalUnits}","Estimated Asset Value: ₹${totalEstCost.toLocaleString('en-IN')}"`);
+  lines.push('');
+
+  lines.push([
+    '"Item Name / Description"',
+    '"Category"',
+    '"Quantity (Units)"',
+    '"Unit Type"',
+    '"Condition / Health"',
+    '"Storage Location"',
+    '"Estimated Cost (INR)"',
+    '"Purchase / Audit Date"',
+    '"Last Updated"',
+    '"Notes / Specifications"'
+  ].join(','));
+
+  assets.forEach(a => {
+    lines.push([
+      `"${(a.itemName || '').replace(/"/g, '""')}"`,
+      `"${a.category}"`,
+      `"${a.quantity}"`,
+      `"${a.unit || 'pcs'}"`,
+      `"${a.condition}"`,
+      `"${(a.storageLocation || '-').replace(/"/g, '""')}"`,
+      `"${a.estimatedCost ? '₹' + a.estimatedCost : '-'}"`,
+      `"${a.purchasedDate || '-'}"`,
+      `"${a.lastUpdated || '-'}"`,
+      `"${(a.notes || '-').replace(/"/g, '""')}"`
+    ].join(','));
+  });
+
+  const csvBlob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(csvBlob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `KSSB_FC_Camp_Assets_Inventory_${timestamp}.csv`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Downloads a comprehensive CSV report for Camp Expenses Ledger.
+ */
+export function downloadExpensesReportCSV(expenses: CampExpense[], filterMonth?: string) {
+  const timestamp = new Date().toISOString().split('T')[0];
+  const filtered = filterMonth && filterMonth !== 'All'
+    ? expenses.filter(e => e.expenseDate && e.expenseDate.startsWith(filterMonth))
+    : expenses;
+
+  const totalExpenseAmount = filtered.reduce((s, e) => s + (e.amount || 0), 0);
+
+  const lines: string[] = [];
+  lines.push(`"KADAMTALA SPORTING SUBHAS BHOWMICK FOOTBALL CLUB (KSSB FC)"`);
+  lines.push(`"CAMP EXPENDITURE & ACCOUNTS VOUCHER REPORT"`);
+  lines.push(`"Filter Period: ${filterMonth || 'All Time'}"`);
+  lines.push(`"Generated On: ${new Date().toLocaleString()}"`);
+  lines.push(`"Total Expense Vouchers: ${filtered.length}","Total Expenditure Incurred: ₹${totalExpenseAmount.toLocaleString('en-IN')}"`);
+  lines.push('');
+
+  lines.push([
+    '"Expense Title / Description"',
+    '"Category"',
+    '"Amount (INR)"',
+    '"Expense Date"',
+    '"Payment Mode / Channel"',
+    '"Paid To / Vendor / Beneficiary"',
+    '"Bill / Invoice No."',
+    '"Logged By"',
+    '"Notes / Remarks"'
+  ].join(','));
+
+  filtered.forEach(e => {
+    lines.push([
+      `"${(e.title || '').replace(/"/g, '""')}"`,
+      `"${e.category}"`,
+      `"${e.amount}"`,
+      `"${e.expenseDate}"`,
+      `"${e.paymentMode}"`,
+      `"${(e.paidTo || '-').replace(/"/g, '""')}"`,
+      `"${(e.billInvoiceNo || '-').replace(/"/g, '""')}"`,
+      `"${e.loggedBy || 'Admin'}"`,
+      `"${(e.notes || '-').replace(/"/g, '""')}"`
+    ].join(','));
+  });
+
+  const csvBlob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(csvBlob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `KSSB_FC_Camp_Expenses_${filterMonth ? filterMonth.replace(/\s+/g, '_') : 'All'}_${timestamp}.csv`;
   document.body.appendChild(anchor);
   anchor.click();
   document.body.removeChild(anchor);

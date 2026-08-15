@@ -23,46 +23,112 @@ export default function FeesTracker({
   const isStudent = role === 'student';
   const [selectedMonth, setSelectedMonth] = useState('August 2026');
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [feeTypeFilter, setFeeTypeFilter] = useState<'All' | 'Registration' | 'Monthly'>('All');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Paid'>('All');
+  const [feeTypeFilter, setFeeTypeFilter] = useState<'All' | 'Registration' | 'Monthly' | 'PendingRegistration'>('All');
   
   // Updating fee modal state
   const [editingFee, setEditingFee] = useState<FeeStatus | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('Cash Handover');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [regSettlementMode, setRegSettlementMode] = useState<'Paid' | 'Free'>('Paid');
+  const [freeRegCategory, setFreeRegCategory] = useState<'Special Child' | 'Members Child' | 'Coach Reference' | 'Members Reference' | 'Inaugural Free Offer'>('Special Child');
 
   // Viewing Receipt modal state
   const [selectedReceiptFee, setSelectedReceiptFee] = useState<FeeStatus | null>(null);
 
-  // Helper to mark registration fee as Free Inaugural Offer (Admin Only)
-  const handleApplyInauguralFreeOffer = (regFee: FeeStatus) => {
+  // Open modal pre-configured for fee
+  const handleOpenEditModal = (fee: FeeStatus, defaultMode?: 'Paid' | 'Free' | 'Pending', defaultCat?: 'Special Child' | 'Members Child' | 'Coach Reference' | 'Members Reference' | 'Inaugural Free Offer') => {
+    setEditingFee(fee);
+    setPaymentDate(fee.paymentDate || new Date().toISOString().split('T')[0]);
+    if (fee.paymentMethod && !fee.paymentMethod.startsWith('Waived')) {
+      setPaymentMethod(fee.paymentMethod);
+    }
+    const isReg = fee.feeType === 'Registration' || fee.month.startsWith('Registration Fee');
+    
+    if (isReg) {
+      if (defaultMode) {
+        setRegSettlementMode(defaultMode === 'Pending' ? 'Paid' : defaultMode);
+      } else if (fee.amount === 0 || (fee.month && fee.month.includes('('))) {
+        setRegSettlementMode('Free');
+      } else {
+        setRegSettlementMode('Paid');
+      }
+
+      if (defaultCat) {
+        setFreeRegCategory(defaultCat);
+      } else if (fee.month.includes('Special Child')) {
+        setFreeRegCategory('Special Child');
+      } else if (fee.month.includes('Members Child')) {
+        setFreeRegCategory('Members Child');
+      } else if (fee.month.includes('Coach Reference')) {
+        setFreeRegCategory('Coach Reference');
+      } else if (fee.month.includes('Members Reference')) {
+        setFreeRegCategory('Members Reference');
+      } else if (fee.month.includes('Inaugural Free Offer')) {
+        setFreeRegCategory('Inaugural Free Offer');
+      } else {
+        setFreeRegCategory('Special Child');
+      }
+    }
+  };
+
+  // Helper to mark registration fee as Free Waiver directly (Admin Only)
+  const handleMarkAsFreeWaiver = (regFee: FeeStatus, category: 'Special Child' | 'Members Child' | 'Coach Reference' | 'Members Reference' | 'Inaugural Free Offer' = 'Special Child') => {
     const today = new Date().toISOString().split('T')[0];
-    const recNum = regFee.receiptNumber || `KSSB-FREE-OFFER-${String(Math.floor(1000 + Math.random() * 9000))}`;
+    let monthTitle = `Registration Fee (${category})`;
+    let methodTitle = `Waived - ${category}`;
+    let recPrefix = 'KSSB-FREE-';
+
+    if (category === 'Special Child') recPrefix = 'KSSB-FREE-SPECIAL-';
+    else if (category === 'Members Child') recPrefix = 'KSSB-FREE-MEMBERS-';
+    else if (category === 'Coach Reference') recPrefix = 'KSSB-FREE-COACH-';
+    else if (category === 'Members Reference') recPrefix = 'KSSB-FREE-MEM-REF-';
+    else if (category === 'Inaugural Free Offer') {
+      methodTitle = 'Inaugural Offer Waived (First 15 Students)';
+      recPrefix = 'KSSB-FREE-OFFER-';
+    }
+
+    const student = students.find(s => s.id === regFee.studentId);
+    const recNum = regFee.receiptNumber || (recPrefix + (student?.registrationNumber ? student.registrationNumber.replace(/[\/\s]/g, '-') : Math.floor(1000 + Math.random() * 9000)));
+
     onUpdateFee({
       ...regFee,
       amount: 0,
       status: 'Paid',
-      month: 'Registration Fee (Inaugural Free Offer)',
+      month: monthTitle,
       paymentDate: today,
-      paymentMethod: 'Inaugural Offer Waived (First 15 Students)',
+      paymentMethod: methodTitle,
       receiptNumber: recNum
     });
   };
 
-  // Helper to mark registration fee received (Admin Only)
+  // Helper to mark registration fee received directly (Admin Only)
   const handleMarkRegistrationFeeReceived = (regFee: FeeStatus) => {
-    if (regFee.status === 'Paid') {
-      alert('This fee is already settled and locked.');
-      return;
-    }
     const today = new Date().toISOString().split('T')[0];
-    const recNum = regFee.receiptNumber || `KSSB-REG-2026-${String(Math.floor(1000 + Math.random() * 9000))}`;
+    const student = students.find(s => s.id === regFee.studentId);
+    const recNum = regFee.receiptNumber || (`KSSB-REG-2026-` + (student?.registrationNumber ? student.registrationNumber.replace(/[\/\s]/g, '-') : Math.floor(1000 + Math.random() * 9000)));
     onUpdateFee({
       ...regFee,
+      amount: 350,
       status: 'Paid',
+      month: 'Registration Fee',
       paymentDate: today,
-      paymentMethod: 'Cash / Direct Settlement',
+      paymentMethod: paymentMethod || 'Cash Handover',
       receiptNumber: recNum
+    });
+  };
+
+  // Helper to reset a fee back to Pending (Admin Only)
+  const handleResetFeeToPending = (fee: FeeStatus) => {
+    const isReg = fee.feeType === 'Registration' || fee.month.startsWith('Registration Fee');
+    onUpdateFee({
+      ...fee,
+      amount: isReg ? 350 : 150,
+      status: 'Pending',
+      month: isReg ? 'Registration Fee' : fee.month,
+      paymentDate: undefined,
+      paymentMethod: undefined,
+      receiptNumber: undefined
     });
   };
 
@@ -70,23 +136,60 @@ export default function FeesTracker({
     e.preventDefault();
     if (!editingFee) return;
 
-    if (editingFee.status === 'Paid') {
-      alert('Fees marked as settled cannot be changed.');
-      setEditingFee(null);
-      return;
-    }
-
     const isReg = editingFee.feeType === 'Registration' || editingFee.month.startsWith('Registration Fee');
-    const recPrefix = isReg ? 'KSSB-REG-2026-' : 'KSSB-MON-2026-';
-    const recNum = editingFee.receiptNumber || (recPrefix + Math.floor(1000 + Math.random() * 9000));
+    
+    if (isReg) {
+      if (regSettlementMode === 'Free') {
+        let monthTitle = `Registration Fee (${freeRegCategory})`;
+        let methodTitle = `Waived - ${freeRegCategory}`;
+        let recPrefix = 'KSSB-FREE-';
 
-    onUpdateFee({
-      ...editingFee,
-      status: 'Paid',
-      paymentDate,
-      paymentMethod,
-      receiptNumber: recNum
-    });
+        if (freeRegCategory === 'Special Child') recPrefix = 'KSSB-FREE-SPECIAL-';
+        else if (freeRegCategory === 'Members Child') recPrefix = 'KSSB-FREE-MEMBERS-';
+        else if (freeRegCategory === 'Coach Reference') recPrefix = 'KSSB-FREE-COACH-';
+        else if (freeRegCategory === 'Members Reference') recPrefix = 'KSSB-FREE-MEM-REF-';
+        else if (freeRegCategory === 'Inaugural Free Offer') {
+          methodTitle = 'Inaugural Offer Waived (First 15 Students)';
+          recPrefix = 'KSSB-FREE-OFFER-';
+        }
+
+        const student = students.find(s => s.id === editingFee.studentId);
+        const recNum = editingFee.receiptNumber || (recPrefix + (student?.registrationNumber ? student.registrationNumber.replace(/[\/\s]/g, '-') : Math.floor(1000 + Math.random() * 9000)));
+
+        onUpdateFee({
+          ...editingFee,
+          amount: 0,
+          status: 'Paid',
+          month: monthTitle,
+          paymentDate,
+          paymentMethod: methodTitle,
+          receiptNumber: recNum
+        });
+      } else {
+        const student = students.find(s => s.id === editingFee.studentId);
+        const recNum = editingFee.receiptNumber || ('KSSB-REG-2026-' + (student?.registrationNumber ? student.registrationNumber.replace(/[\/\s]/g, '-') : Math.floor(1000 + Math.random() * 9000)));
+        onUpdateFee({
+          ...editingFee,
+          amount: 350,
+          status: 'Paid',
+          month: 'Registration Fee',
+          paymentDate,
+          paymentMethod,
+          receiptNumber: recNum
+        });
+      }
+    } else {
+      const recPrefix = 'KSSB-MON-2026-';
+      const recNum = editingFee.receiptNumber || (recPrefix + Math.floor(1000 + Math.random() * 9000));
+
+      onUpdateFee({
+        ...editingFee,
+        status: 'Paid',
+        paymentDate,
+        paymentMethod,
+        receiptNumber: recNum
+      });
+    }
 
     setEditingFee(null);
   };
@@ -256,24 +359,85 @@ export default function FeesTracker({
   }
 
   // ALL ADMIN / COACH AGGREGATES:
+  // Sort students in enrollment sequence order
+  const sortedStudents = [...students].sort((a, b) => {
+    if (a.registrationNumber && b.registrationNumber) {
+      const matchA = a.registrationNumber.match(/KSSBFC(\d+)\//i);
+      const matchB = b.registrationNumber.match(/KSSBFC(\d+)\//i);
+      if (matchA && matchB) {
+        return parseInt(matchA[1], 10) - parseInt(matchB[1], 10);
+      }
+    }
+    return (a.registrationDate || '').localeCompare(b.registrationDate || '');
+  });
+
+  const first15StudentIds = new Set(sortedStudents.slice(0, 15).map(s => s.id));
   const activeStudentIds = new Set(students.map(s => s.id));
-  const activeFees = fees.filter(f => activeStudentIds.has(f.studentId));
+  
+  // Guarantee every active student has a Registration fee record in the working list
+  // and ensure only the first 15 students have the Inaugural Free Offer
+  const normalizedFees: FeeStatus[] = fees.map(f => {
+    const isReg = f.feeType === 'Registration' || f.month.startsWith('Registration Fee');
+    if (isReg) {
+      const isStudentInFirst15 = first15StudentIds.has(f.studentId);
+      const isInaugural = f.month.includes('Inaugural') || (f.paymentMethod && f.paymentMethod.includes('Inaugural'));
+      // If student is #16+ and had Inaugural Free Offer, normalize to ₹350 Pending
+      if (!isStudentInFirst15 && isInaugural) {
+        return {
+          ...f,
+          month: 'Registration Fee',
+          amount: 350,
+          status: 'Pending' as const,
+          paymentMethod: undefined,
+          paymentDate: undefined,
+          receiptNumber: undefined
+        };
+      }
+    }
+    return f;
+  });
 
-  // Registration Fees
+  sortedStudents.forEach((student, idx) => {
+    const isFirst15 = idx < 15;
+    const hasRegFee = normalizedFees.some(f => f.studentId === student.id && (f.feeType === 'Registration' || f.month.startsWith('Registration Fee')));
+    if (!hasRegFee) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      normalizedFees.push({
+        id: 'f_reg_' + student.id,
+        studentId: student.id,
+        feeType: 'Registration',
+        month: isFirst15 ? 'Registration Fee (Inaugural Free Offer)' : 'Registration Fee',
+        amount: isFirst15 ? 0 : 350,
+        status: isFirst15 ? 'Paid' : 'Pending',
+        paymentMethod: isFirst15 ? 'Inaugural Offer Waived (First 15 Students)' : undefined,
+        paymentDate: isFirst15 ? (student.registrationDate || todayStr) : undefined,
+        receiptNumber: isFirst15 ? `KSSB-FREE-OFFER-${String(idx + 1).padStart(2, '0')}` : undefined
+      });
+    }
+  });
+
+  const activeFees = normalizedFees.filter(f => activeStudentIds.has(f.studentId));
+
+  // Registration Fees Aggregates
   const allRegFees = activeFees.filter(f => f.feeType === 'Registration' || f.month.startsWith('Registration Fee'));
-  const freeRegCount = allRegFees.filter(f => f.amount === 0 || (f.month && f.month.includes('Inaugural'))).length;
-  const regFeeCollected = allRegFees.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);
-  const regFeePending = allRegFees.filter(f => f.status !== 'Paid').reduce((sum, f) => sum + f.amount, 0);
+  const pendingRegFeesList = allRegFees.filter(f => f.status !== 'Paid');
+  const paidRegFeesList = allRegFees.filter(f => f.status === 'Paid');
+  
+  const freeRegCount = allRegFees.filter(f => f.amount === 0 || (f.month && (f.month.includes('Inaugural') || f.month.includes('Free') || f.month.includes('Special') || f.month.includes('Members') || f.month.includes('Coach')))).length;
+  const regFeeCollected = paidRegFeesList.reduce((sum, f) => sum + f.amount, 0);
+  const regFeePending = pendingRegFeesList.reduce((sum, f) => sum + (f.amount || 350), 0);
 
-  // Monthly Fees
+  // Monthly Fees Aggregates
   const allMonthlyFees = activeFees.filter(f => f.feeType !== 'Registration' && !f.month.startsWith('Registration Fee'));
   const selectedMonthlyFees = selectedMonth === 'All' ? allMonthlyFees : allMonthlyFees.filter(f => f.month === selectedMonth);
+  const pendingMonthlyList = selectedMonthlyFees.filter(f => f.status !== 'Paid');
+  const paidMonthlyList = selectedMonthlyFees.filter(f => f.status === 'Paid');
   
-  const monthlyFeeCollected = selectedMonthlyFees.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);
-  const monthlyFeePending = selectedMonthlyFees.filter(f => f.status !== 'Paid').reduce((sum, f) => sum + f.amount, 0);
+  const monthlyFeeCollected = paidMonthlyList.reduce((sum, f) => sum + f.amount, 0);
+  const monthlyFeePending = pendingMonthlyList.reduce((sum, f) => sum + f.amount, 0);
 
   // Filtered List for Table
-  const filteredFees = fees.filter(fee => {
+  const filteredFees = normalizedFees.filter(fee => {
     const student = students.find(s => s.id === fee.studentId);
     if (!student) return false;
 
@@ -285,11 +449,16 @@ export default function FeesTracker({
     const isReg = fee.feeType === 'Registration' || fee.month.startsWith('Registration Fee');
     
     // Fee Type filter
-    if (feeTypeFilter === 'Registration' && !isReg) return false;
-    if (feeTypeFilter === 'Monthly' && isReg) return false;
+    if (feeTypeFilter === 'PendingRegistration') {
+      if (!isReg || fee.status === 'Paid') return false;
+    } else if (feeTypeFilter === 'Registration') {
+      if (!isReg) return false;
+    } else if (feeTypeFilter === 'Monthly') {
+      if (isReg) return false;
+    }
 
     // Month Filter (only applies to monthly fees)
-    if (!isReg && selectedMonth !== 'All' && fee.month !== selectedMonth) return false;
+    if (!isReg && selectedMonth !== 'All' && fee.month !== selectedMonth && feeTypeFilter !== 'PendingRegistration') return false;
 
     // Status filter
     if (statusFilter !== 'All' && fee.status !== statusFilter) return false;
@@ -311,24 +480,101 @@ export default function FeesTracker({
         </span>
       </div>
 
+      {/* Pending Registration Fees Action Alert Banner */}
+      {pendingRegFeesList.length > 0 && (
+        <div className="p-4 bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-amber-500/10 border-2 border-amber-400/80 rounded-2xl shadow-md space-y-3 animate-fade-in" id="pending-reg-alert-banner">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black text-xl shrink-0 shadow-sm animate-pulse">
+                ⚠️
+              </div>
+              <div>
+                <div className="font-black text-amber-950 text-base flex items-center gap-2 flex-wrap">
+                  Action Required: {pendingRegFeesList.length} Student{pendingRegFeesList.length > 1 ? 's' : ''} with PENDING Registration Fee (₹350)
+                  <span className="px-2 py-0.5 bg-rose-600 text-white font-mono text-[10px] font-bold rounded-md uppercase">
+                    Total Pending: ₹{regFeePending}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-700 font-medium pt-0.5">
+                  Registration fees (₹350) for athletes enrolled after the inaugural first 15 or with unpaid registration must be marked as Paid or Waived (Free).
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setFeeTypeFilter('PendingRegistration');
+                setStatusFilter('Pending');
+              }}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black shadow-sm transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border border-amber-600/40"
+            >
+              <span>View {pendingRegFeesList.length} Pending Athletes</span>
+              <ArrowLeft size={14} className="rotate-180" />
+            </button>
+          </div>
+
+          {/* Quick Pending Athletes Pills */}
+          <div className="pt-2 border-t border-amber-300/40 flex flex-wrap gap-2 items-center">
+            <span className="text-[11px] font-mono font-bold text-amber-950 uppercase tracking-wide mr-1">
+              Pending Athletes:
+            </span>
+            {pendingRegFeesList.map(pFee => {
+              const pStudent = students.find(s => s.id === pFee.studentId);
+              if (!pStudent) return null;
+              return (
+                <div 
+                  key={pFee.id}
+                  className="bg-white/90 border border-amber-300 rounded-xl p-1.5 pl-2.5 pr-1.5 flex items-center gap-2 text-xs shadow-2xs hover:bg-white transition-all"
+                >
+                  <StudentAvatar photoUrl={pStudent.photoUrl} name={pStudent.name} size="sm" />
+                  <div className="leading-tight">
+                    <span className="font-bold text-gray-900 block">{pStudent.name}</span>
+                    <span className="text-[10px] font-mono text-emerald-800 font-semibold">{pStudent.registrationNumber || 'KSSBFC'}</span>
+                  </div>
+                  <div className="flex items-center gap-1 ml-1">
+                    <button
+                      onClick={() => handleOpenEditModal(pFee, 'Paid')}
+                      className="px-2 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10px] font-bold shadow-2xs transition-all cursor-pointer flex items-center gap-0.5"
+                      title="Mark Registration Fee Paid (₹350)"
+                    >
+                      <CreditCard size={10} />
+                      <span>₹350</span>
+                    </button>
+                    <button
+                      onClick={() => handleOpenEditModal(pFee, 'Free')}
+                      className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-[10px] font-black shadow-2xs transition-all cursor-pointer flex items-center gap-0.5 border border-amber-400"
+                      title="Mark Registration Fee as Free Waiver"
+                    >
+                      <Tag size={10} />
+                      <span>Free</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Inaugural Admission Offer Announcement Banner */}
-      <div className="p-4 bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs" id="inaugural-offer-banner">
+      <div className="p-4 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-500/30 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs" id="inaugural-offer-banner">
         <div className="flex items-start sm:items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-700 flex items-center justify-center font-bold text-xl shrink-0 border border-amber-500/30 shadow-2xs">
             🎁
           </div>
           <div>
             <div className="font-black text-gray-900 text-sm flex items-center gap-2 flex-wrap">
-              Inaugural Admission Offer: FREE Registration Fee
-              <span className="px-2 py-0.5 bg-amber-500 text-white font-mono text-[10px] font-extrabold rounded-full uppercase">First 15 Students</span>
+              Registration Fee Policy & Inaugural Waiver Offer
+              <span className="px-2 py-0.5 bg-amber-500 text-white font-mono text-[10px] font-extrabold rounded-full uppercase">First 15 Free</span>
+              <span className="px-2 py-0.5 bg-emerald-800 text-white font-mono text-[10px] font-bold rounded-full uppercase">Player #16+ ₹350</span>
             </div>
             <p className="text-xs text-gray-600 font-medium pt-0.5">
-              Registration fee (₹350) is 100% waived/free for the first 15 student enrollments as an inaugural offer.
+              First 15 student enrollments enjoy 100% free inaugural registration admission. Subsequent enrollments (Player #16 onwards) pay standard ₹350 registration fee unless granted a special waiver.
             </p>
           </div>
         </div>
         <div className="px-3.5 py-1.5 bg-emerald-950 text-emerald-200 rounded-xl font-mono text-xs font-bold border border-emerald-700 shrink-0">
-          Offer Slots Used: <span className="text-amber-400 font-black">{freeRegCount} / 15</span> Students
+          Inaugural Free Slots: <span className="text-amber-400 font-black">{Math.min(freeRegCount, 15)} / 15</span> | Total Enrolled: <span className="text-white font-black">{students.length}</span>
         </div>
       </div>
 
@@ -341,37 +587,77 @@ export default function FeesTracker({
         />
       )}
 
-      {/* Financial Overview Metrics Cards (4 Distinct Separated Indicators) */}
+      {/* Financial Overview Metrics Cards (Interactive Filters) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="fees-overview-grid">
         
         {/* Registration Fee Collected */}
-        <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-2xl shadow-sm space-y-1.5" id="fees-reg-collected">
+        <button 
+          type="button"
+          onClick={() => {
+            setFeeTypeFilter('Registration');
+            setStatusFilter('Paid');
+          }}
+          className={`text-left p-5 rounded-2xl shadow-sm space-y-1.5 transition-all cursor-pointer border ${
+            feeTypeFilter === 'Registration' && statusFilter === 'Paid'
+              ? 'bg-emerald-100 border-emerald-500 ring-2 ring-emerald-500 shadow-md'
+              : 'bg-emerald-50/90 border-emerald-200 hover:bg-emerald-100/60'
+          }`}
+          id="fees-reg-collected"
+        >
           <div className="flex justify-between items-center text-emerald-800">
-            <span className="text-[10px] font-mono uppercase tracking-wider block font-bold">Registration Fee Collected</span>
+            <span className="text-[10px] font-mono uppercase tracking-wider block font-bold">Registration Collected</span>
             <Tag size={16} className="text-emerald-600" />
           </div>
           <div className="text-3xl font-black text-emerald-950 flex items-center">
             <CheckCircle2 size={22} className="text-emerald-600 mr-1.5" />
             ₹{regFeeCollected}
           </div>
-          <p className="text-[11px] text-emerald-700 font-medium">₹350 One-Time Registration Fee</p>
-        </div>
+          <p className="text-[11px] text-emerald-700 font-medium">
+            {paidRegFeesList.length} Settled ({freeRegCount} Free Waivers)
+          </p>
+        </button>
 
         {/* Registration Fee Pending */}
-        <div className="p-5 bg-amber-50 border border-amber-100 rounded-2xl shadow-sm space-y-1.5" id="fees-reg-pending">
+        <button 
+          type="button"
+          onClick={() => {
+            setFeeTypeFilter('PendingRegistration');
+            setStatusFilter('Pending');
+          }}
+          className={`text-left p-5 rounded-2xl shadow-sm space-y-1.5 transition-all cursor-pointer border ${
+            feeTypeFilter === 'PendingRegistration'
+              ? 'bg-amber-100 border-amber-500 ring-2 ring-amber-500 shadow-md'
+              : 'bg-amber-50/90 border-amber-200 hover:bg-amber-100/60'
+          }`}
+          id="fees-reg-pending"
+        >
           <div className="flex justify-between items-center text-amber-800">
-            <span className="text-[10px] font-mono uppercase tracking-wider block font-bold">Registration Fee Pending</span>
+            <span className="text-[10px] font-mono uppercase tracking-wider block font-bold">Registration Pending</span>
             <Clock size={16} className="text-amber-600" />
           </div>
           <div className="text-3xl font-black text-amber-950 flex items-center">
             <Clock size={22} className="text-amber-600 mr-1.5" />
             ₹{regFeePending}
           </div>
-          <p className="text-[11px] text-amber-700 font-medium">Outstanding ₹350 Enrolments</p>
-        </div>
+          <p className="text-[11px] text-amber-700 font-medium">
+            {pendingRegFeesList.length} Player{pendingRegFeesList.length !== 1 ? 's' : ''} Pending (₹350 each)
+          </p>
+        </button>
 
         {/* Monthly Fee Collected */}
-        <div className="p-5 bg-indigo-50 border border-indigo-100 rounded-2xl shadow-sm space-y-1.5" id="fees-monthly-collected">
+        <button 
+          type="button"
+          onClick={() => {
+            setFeeTypeFilter('Monthly');
+            setStatusFilter('Paid');
+          }}
+          className={`text-left p-5 rounded-2xl shadow-sm space-y-1.5 transition-all cursor-pointer border ${
+            feeTypeFilter === 'Monthly' && statusFilter === 'Paid'
+              ? 'bg-indigo-100 border-indigo-500 ring-2 ring-indigo-500 shadow-md'
+              : 'bg-indigo-50/90 border-indigo-200 hover:bg-indigo-100/60'
+          }`}
+          id="fees-monthly-collected"
+        >
           <div className="flex justify-between items-center text-indigo-800">
             <span className="text-[10px] font-mono uppercase tracking-wider block font-bold">Monthly Fee Collected</span>
             <IndianRupee size={16} className="text-indigo-600" />
@@ -380,11 +666,23 @@ export default function FeesTracker({
             <CheckCircle2 size={22} className="text-indigo-600 mr-1.5" />
             ₹{monthlyFeeCollected}
           </div>
-          <p className="text-[11px] text-indigo-700 font-medium">Monthly ₹150 Training Tuition ({selectedMonth})</p>
-        </div>
+          <p className="text-[11px] text-indigo-700 font-medium">Monthly ₹150 Tuition ({selectedMonth})</p>
+        </button>
 
         {/* Monthly Fee Pending */}
-        <div className="p-5 bg-rose-50 border border-rose-100 rounded-2xl shadow-sm space-y-1.5" id="fees-monthly-pending">
+        <button 
+          type="button"
+          onClick={() => {
+            setFeeTypeFilter('Monthly');
+            setStatusFilter('Pending');
+          }}
+          className={`text-left p-5 rounded-2xl shadow-sm space-y-1.5 transition-all cursor-pointer border ${
+            feeTypeFilter === 'Monthly' && statusFilter === 'Pending'
+              ? 'bg-rose-100 border-rose-500 ring-2 ring-rose-500 shadow-md'
+              : 'bg-rose-50/90 border-rose-200 hover:bg-rose-100/60'
+          }`}
+          id="fees-monthly-pending"
+        >
           <div className="flex justify-between items-center text-rose-800">
             <span className="text-[10px] font-mono uppercase tracking-wider block font-bold">Monthly Fee Pending</span>
             <AlertTriangle size={16} className="text-rose-600" />
@@ -393,8 +691,8 @@ export default function FeesTracker({
             <AlertTriangle size={22} className="text-rose-600 mr-1.5" />
             ₹{monthlyFeePending}
           </div>
-          <p className="text-[11px] text-rose-700 font-medium">Outstanding Monthly Fees ({selectedMonth})</p>
-        </div>
+          <p className="text-[11px] text-rose-700 font-medium">{pendingMonthlyList.length} Pending ({selectedMonth})</p>
+        </button>
 
       </div>
 
@@ -418,41 +716,91 @@ export default function FeesTracker({
           <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
             
             {/* Category Filter */}
-            <div className="flex items-center gap-1.5 bg-gray-50 p-1 rounded-xl border border-gray-200 text-xs">
-              <span className="text-[10px] font-mono font-bold text-gray-500 uppercase px-1.5">Type:</span>
-              {(['All', 'Registration', 'Monthly'] as const).map(type => (
+            <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200 text-xs flex-wrap">
+              <span className="text-[10px] font-mono font-bold text-gray-500 uppercase px-1.5">View:</span>
+              
+              <button
+                onClick={() => { setFeeTypeFilter('All'); setStatusFilter('All'); }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+                  feeTypeFilter === 'All' && statusFilter === 'All' ? 'bg-slate-900 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                All Fees
+              </button>
+
+              <button
+                onClick={() => { setFeeTypeFilter('PendingRegistration'); setStatusFilter('Pending'); }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center gap-1 ${
+                  feeTypeFilter === 'PendingRegistration' 
+                    ? 'bg-amber-500 text-slate-950 font-black shadow-xs ring-1 ring-amber-600' 
+                    : 'text-amber-800 bg-amber-50 hover:bg-amber-100'
+                }`}
+              >
+                <span>⚡ Pending Reg Fees</span>
+                {pendingRegFeesList.length > 0 && (
+                  <span className="px-1.5 py-0.2 bg-rose-600 text-white rounded-full text-[10px] font-black">
+                    {pendingRegFeesList.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setFeeTypeFilter('Registration')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+                  feeTypeFilter === 'Registration' ? 'bg-emerald-700 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Reg Fees (₹350/Free)
+              </button>
+
+              <button
+                onClick={() => setFeeTypeFilter('Monthly')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+                  feeTypeFilter === 'Monthly' ? 'bg-indigo-700 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Monthly Fees (₹150)
+              </button>
+            </div>
+
+            {/* Status Filter */}
+            <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200 text-xs">
+              <span className="text-[10px] font-mono font-bold text-gray-500 uppercase px-1.5">Status:</span>
+              {(['All', 'Pending', 'Paid'] as const).map(st => (
                 <button
-                  key={type}
-                  onClick={() => setFeeTypeFilter(type)}
+                  key={st}
+                  onClick={() => setStatusFilter(st)}
                   className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                    feeTypeFilter === type ? 'bg-emerald-700 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                    statusFilter === st ? 'bg-gray-800 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  {type === 'Registration' ? 'Reg Fee (₹350)' : type === 'Monthly' ? 'Monthly (₹150)' : 'All Fees'}
+                  {st === 'All' ? 'All' : st === 'Pending' ? 'Pending' : 'Settled (Paid)'}
                 </button>
               ))}
             </div>
 
             {/* Month Select */}
-            <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-xl border border-gray-200 text-xs">
-              <span className="text-[10px] font-mono font-bold text-gray-500 uppercase">Month:</span>
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="bg-transparent font-bold text-gray-800 focus:outline-none"
-              >
-                <option value="All">All Months</option>
-                <option value="August 2026">August 2026</option>
-                <option value="September 2026">September 2026</option>
-                <option value="October 2026">October 2026</option>
-                <option value="November 2026">November 2026</option>
-                <option value="December 2026">December 2026</option>
-              </select>
-            </div>
+            {feeTypeFilter !== 'PendingRegistration' && feeTypeFilter !== 'Registration' && (
+              <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-xl border border-gray-200 text-xs">
+                <span className="text-[10px] font-mono font-bold text-gray-500 uppercase">Month:</span>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="bg-transparent font-bold text-gray-800 focus:outline-none"
+                >
+                  <option value="All">All Months</option>
+                  <option value="August 2026">August 2026</option>
+                  <option value="September 2026">September 2026</option>
+                  <option value="October 2026">October 2026</option>
+                  <option value="November 2026">November 2026</option>
+                  <option value="December 2026">December 2026</option>
+                </select>
+              </div>
+            )}
 
             {/* CSV Report Export */}
             <button
-              onClick={() => downloadFeesReportCSV(students, fees, selectedMonth)}
+              onClick={() => downloadFeesReportCSV(students, normalizedFees, selectedMonth)}
               className="px-3.5 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ml-auto lg:ml-0"
               id="fees-tracker-download-btn"
             >
@@ -466,7 +814,7 @@ export default function FeesTracker({
       {/* Record Payment Modal */}
       {editingFee && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all" id="edit-payment-modal">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 shadow-xl relative border border-emerald-100">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-xl relative border border-emerald-100 max-h-[90vh] overflow-y-auto">
             
             {/* Modal Header Actions */}
             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
@@ -494,53 +842,120 @@ export default function FeesTracker({
             <div className="space-y-1">
               <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <CreditCard size={18} className="text-emerald-600" />
-                {editingFee.amount === 0 ? 'Confirm Free Inaugural Offer' : `Mark Fee Received (₹${editingFee.amount})`}
+                {(editingFee.feeType === 'Registration' || editingFee.month.startsWith('Registration Fee'))
+                  ? 'Registration Fee Settlement'
+                  : `Mark Fee Received (₹${editingFee.amount})`}
               </h3>
               <p className="text-xs text-gray-500">
-                Student Athlete: <strong>{students.find(s => s.id === editingFee.studentId)?.name}</strong> | Fee Category: <strong>{editingFee.month}</strong>
+                Student Athlete: <strong>{students.find(s => s.id === editingFee.studentId)?.name}</strong> | Category: <strong>{editingFee.month}</strong>
               </p>
             </div>
-            
-            {(editingFee.feeType === 'Registration' || editingFee.month.startsWith('Registration Fee')) && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-xs">
-                <div className="font-bold text-amber-900 flex items-center gap-1.5">
-                  🎁 Inaugural Admission Offer
-                </div>
-                <p className="text-amber-800 text-[11px]">
-                  Waive registration fee (₹350) for this student athlete under the inaugural offer for the first 15 students.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleApplyInauguralFreeOffer(editingFee);
-                    setEditingFee(null);
-                  }}
-                  className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs border border-amber-400"
-                >
-                  🎁 Apply Inaugural Free Admission Offer (₹0.00)
-                </button>
-              </div>
-            )}
 
             <form onSubmit={handleSavePayment} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono font-bold text-gray-700 uppercase">Payment Method / Channel</label>
-                <select 
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold bg-white"
-                >
-                  <option value="Cash Handover">Cash Handover</option>
-                  <option value="UPI / GPay / PhonePe">UPI / PhonePe / GPay</option>
-                  <option value="Bank Transfer">Direct Bank Transfer</option>
-                  <option value="Inaugural Offer Waived (First 15 Students)">Inaugural Offer Waived (Free Admission)</option>
-                  <option value="Credit/Debit Card">Credit/Debit Card</option>
-                  <option value="Check">Paper Check</option>
-                </select>
-              </div>
+              
+              {/* Registration Fee Type Toggle (Paid vs Free) */}
+              {(editingFee.feeType === 'Registration' || editingFee.month.startsWith('Registration Fee')) ? (
+                <div className="space-y-3 pt-1 border-t border-gray-100">
+                  <label className="text-xs font-mono font-bold text-gray-700 uppercase block">Settlement Option</label>
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setRegSettlementMode('Paid')}
+                      className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        regSettlementMode === 'Paid'
+                          ? 'bg-emerald-700 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      💳 Paid Fee (₹350)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRegSettlementMode('Free')}
+                      className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        regSettlementMode === 'Free'
+                          ? 'bg-amber-500 text-slate-950 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      🎁 Free Registration (₹0)
+                    </button>
+                  </div>
+
+                  {regSettlementMode === 'Free' ? (
+                    <div className="space-y-2 p-3 bg-amber-50/90 border border-amber-200 rounded-xl">
+                      <label className="text-xs font-mono font-bold text-amber-900 uppercase block">Select Free Registration Category</label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        {[
+                          { id: 'Special Child', label: 'Special Child', icon: '🌟', desc: '100% Free Registration' },
+                          { id: 'Members Child', label: 'Members Child', icon: '🏆', desc: 'Club Member Privilege' },
+                          { id: 'Coach Reference', label: 'Coach Reference', icon: '⚽', desc: 'Recommended by Coach' },
+                          { id: 'Members Reference', label: 'Members Reference', icon: '🤝', desc: 'Recommended by Member' },
+                          { id: 'Inaugural Free Offer', label: 'Inaugural Offer', icon: '🎁', desc: 'First 15 Students Offer' },
+                        ].map(cat => (
+                          <label 
+                            key={cat.id} 
+                            className={`p-2.5 rounded-xl border flex items-start gap-2 cursor-pointer transition-all ${
+                              freeRegCategory === cat.id 
+                                ? 'bg-white border-amber-500 ring-2 ring-amber-400/50 text-amber-950 font-bold shadow-2xs' 
+                                : 'bg-white/70 border-amber-200/80 text-gray-700 hover:bg-white'
+                            }`}
+                          >
+                            <input 
+                              type="radio" 
+                              name="freeCategory" 
+                              value={cat.id} 
+                              checked={freeRegCategory === cat.id} 
+                              onChange={() => setFreeRegCategory(cat.id as any)}
+                              className="mt-0.5 text-amber-600 focus:ring-amber-500"
+                            />
+                            <div>
+                              <div className="flex items-center gap-1 font-bold leading-tight">
+                                <span>{cat.icon}</span>
+                                <span>{cat.label}</span>
+                              </div>
+                              <span className="text-[10px] text-gray-500 block leading-tight pt-0.5">{cat.desc}</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-mono font-bold text-gray-700 uppercase">Payment Method / Channel</label>
+                      <select 
+                        value={paymentMethod}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold bg-white"
+                      >
+                        <option value="Cash Handover">Cash Handover</option>
+                        <option value="UPI / GPay / PhonePe">UPI / PhonePe / GPay</option>
+                        <option value="Bank Transfer">Direct Bank Transfer</option>
+                        <option value="Credit/Debit Card">Credit/Debit Card</option>
+                        <option value="Check">Paper Check</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono font-bold text-gray-700 uppercase">Payment Method / Channel</label>
+                  <select 
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold bg-white"
+                  >
+                    <option value="Cash Handover">Cash Handover</option>
+                    <option value="UPI / GPay / PhonePe">UPI / PhonePe / GPay</option>
+                    <option value="Bank Transfer">Direct Bank Transfer</option>
+                    <option value="Credit/Debit Card">Credit/Debit Card</option>
+                    <option value="Check">Paper Check</option>
+                  </select>
+                </div>
+              )}
 
               <div className="space-y-1.5">
-                <label className="text-xs font-mono font-bold text-gray-700 uppercase">Payment Date</label>
+                <label className="text-xs font-mono font-bold text-gray-700 uppercase">Payment Settlement Date</label>
                 <input 
                   type="date" 
                   value={paymentDate}
@@ -562,9 +977,16 @@ export default function FeesTracker({
 
                 <button 
                   type="submit"
-                  className="w-full sm:w-auto px-5 py-2 bg-emerald-700 text-white rounded-xl text-xs font-bold hover:bg-emerald-800 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                  className={`w-full sm:w-auto px-5 py-2 rounded-xl text-xs font-extrabold cursor-pointer flex items-center justify-center gap-1.5 shadow-sm transition-all ${
+                    (editingFee.feeType === 'Registration' || editingFee.month.startsWith('Registration Fee')) && regSettlementMode === 'Free'
+                      ? 'bg-amber-500 text-slate-950 hover:bg-amber-600 border border-amber-400'
+                      : 'bg-emerald-700 text-white hover:bg-emerald-800'
+                  }`}
                 >
-                  <CheckCircle2 size={15} /> Confirm Payment & Issue Receipt
+                  <CheckCircle2 size={15} />
+                  {(editingFee.feeType === 'Registration' || editingFee.month.startsWith('Registration Fee')) && regSettlementMode === 'Free'
+                    ? 'Confirm Free Registration & Issue Voucher (₹0.00)'
+                    : 'Confirm Payment & Issue Receipt'}
                 </button>
 
                 <button 
@@ -590,7 +1012,7 @@ export default function FeesTracker({
             filteredFees.map(fee => {
               const student = students.find(s => s.id === fee.studentId);
               const isReg = fee.feeType === 'Registration' || fee.month.startsWith('Registration Fee');
-              const isFree = fee.amount === 0 || (fee.month && fee.month.includes('Inaugural'));
+              const isFree = fee.amount === 0 || (fee.month && (fee.month.includes('Inaugural') || fee.month.includes('Free') || fee.month.includes('Special') || fee.month.includes('Members') || fee.month.includes('Coach')));
               return (
                 <div key={fee.id} className="p-4 bg-gray-50/80 border border-gray-200 rounded-2xl space-y-3">
                   <div className="flex justify-between items-start gap-2">
@@ -600,7 +1022,7 @@ export default function FeesTracker({
                         <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase inline-block mb-0.5 ${
                           isReg ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-indigo-100 text-indigo-900 border border-indigo-200'
                         }`}>
-                          {isReg ? (isFree ? 'Registration Fee (FREE Offer)' : 'Registration Fee (₹350)') : `Monthly Fee (${fee.month})`}
+                          {isReg ? (isFree ? `Registration Fee (FREE - ${fee.month.includes('(') ? fee.month.split('(')[1].replace(')', '') : 'Waived'})` : 'Registration Fee (₹350)') : `Monthly Fee (${fee.month})`}
                         </span>
                         <div className="font-extrabold text-gray-900 text-sm leading-tight">{student?.name || 'Unknown student'}</div>
                         <div className="text-[11px] text-gray-500 font-mono">Reg: {student?.registrationNumber}</div>
@@ -627,25 +1049,25 @@ export default function FeesTracker({
                   {/* Actions */}
                   <div className="flex flex-col gap-2 pt-1 border-t border-gray-200">
                     {fee.status !== 'Paid' && isReg && (
-                      <>
+                      <div className="flex flex-col gap-1.5">
                         <button
-                          onClick={() => handleApplyInauguralFreeOffer(fee)}
-                          className="w-full py-2 bg-amber-500 text-slate-950 hover:bg-amber-600 rounded-xl text-xs font-black shadow-sm transition-all cursor-pointer text-center flex items-center justify-center gap-1.5 border border-amber-400"
+                          onClick={() => handleOpenEditModal(fee, 'Free')}
+                          className="w-full py-2 bg-amber-500 text-slate-950 hover:bg-amber-600 rounded-xl text-xs font-black shadow-2xs transition-all cursor-pointer text-center flex items-center justify-center gap-1.5 border border-amber-400"
                         >
-                          🎁 Mark Free (Inaugural Offer)
+                          🎁 Mark Free Registration (Special/Member/Ref)
                         </button>
                         <button
-                          onClick={() => handleMarkRegistrationFeeReceived(fee)}
-                          className="w-full py-2 bg-emerald-700 text-white hover:bg-emerald-800 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer text-center flex items-center justify-center gap-1.5"
+                          onClick={() => handleOpenEditModal(fee, 'Paid')}
+                          className="w-full py-2 bg-emerald-700 text-white hover:bg-emerald-800 rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer text-center flex items-center justify-center gap-1.5"
                         >
                           <CheckCircle2 size={14} /> Mark Paid (₹350 Standard Fee)
                         </button>
-                      </>
+                      </div>
                     )}
 
                     {fee.status !== 'Paid' && !isReg && (
                       <button
-                        onClick={() => setEditingFee(fee)}
+                        onClick={() => handleOpenEditModal(fee, 'Paid')}
                         className="w-full py-2 bg-emerald-700 text-white hover:bg-emerald-800 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer text-center flex items-center justify-center gap-1.5"
                       >
                         <CreditCard size={14} /> Record Monthly Fee Payment
@@ -695,7 +1117,7 @@ export default function FeesTracker({
                 filteredFees.map(fee => {
                   const student = students.find(s => s.id === fee.studentId);
                   const isReg = fee.feeType === 'Registration' || fee.month.startsWith('Registration Fee');
-                  const isFree = fee.amount === 0 || (fee.month && fee.month.includes('Inaugural'));
+                  const isFree = fee.amount === 0 || (fee.month && (fee.month.includes('Inaugural') || fee.month.includes('Free') || fee.month.includes('Special') || fee.month.includes('Members') || fee.month.includes('Coach')));
                   return (
                     <tr key={fee.id} className="hover:bg-emerald-50/20 transition-colors">
                       
@@ -722,8 +1144,8 @@ export default function FeesTracker({
                       {/* Fee Amount */}
                       <td className="p-4 font-mono text-sm text-gray-950 font-black">
                         {isFree ? (
-                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 border border-emerald-300 font-extrabold rounded-lg text-xs">
-                            FREE (Inaugural)
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 font-extrabold rounded-lg text-xs">
+                            FREE ({fee.month.includes('(') ? fee.month.split('(')[1].replace(')', '') : 'Waived'})
                           </span>
                         ) : (
                           `₹${fee.amount}`
@@ -756,15 +1178,15 @@ export default function FeesTracker({
                           {fee.status !== 'Paid' && isReg && (
                             <>
                               <button
-                                onClick={() => handleApplyInauguralFreeOffer(fee)}
-                                className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-black shadow-sm transition-all cursor-pointer inline-flex items-center gap-1 border border-amber-400"
-                                title="Apply Inaugural Free Admission Offer"
+                                onClick={() => handleOpenEditModal(fee, 'Free')}
+                                className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-black shadow-2xs transition-all cursor-pointer inline-flex items-center gap-1 border border-amber-400"
+                                title="Mark as Free Registration (Special Child, Members Child, Reference)"
                               >
                                 🎁 Mark Free
                               </button>
                               <button
-                                onClick={() => handleMarkRegistrationFeeReceived(fee)}
-                                className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold shadow-sm transition-all cursor-pointer inline-flex items-center gap-1"
+                                onClick={() => handleOpenEditModal(fee, 'Paid')}
+                                className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold shadow-2xs transition-all cursor-pointer inline-flex items-center gap-1"
                                 id="mark-reg-fee-received-btn"
                               >
                                 <CheckCircle2 size={13} /> Mark Paid (₹350)
@@ -774,7 +1196,7 @@ export default function FeesTracker({
 
                           {fee.status !== 'Paid' && !isReg && (
                             <button
-                              onClick={() => setEditingFee(fee)}
+                              onClick={() => handleOpenEditModal(fee, 'Paid')}
                               className="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-xs font-bold shadow-sm transition-all cursor-pointer inline-flex items-center gap-1"
                             >
                               <CreditCard size={14} /> Record Monthly Fee

@@ -78,7 +78,7 @@ export default function StudentPortal({
   const latestAlert = activeAlerts[0];
 
   // Find Registration Fee Record
-  const regFeeRecord = studentFees.find(f => f.feeType === 'Registration' || f.month === 'Registration Fee') || {
+  const regFeeRecord = studentFees.find(f => f.feeType === 'Registration' || f.month.startsWith('Registration Fee')) || {
     id: 'f_reg_' + student.id,
     studentId: student.id,
     feeType: 'Registration' as const,
@@ -88,7 +88,7 @@ export default function StudentPortal({
   };
 
   // Monthly Fees History
-  const monthlyFeesHistory = studentFees.filter(f => f.feeType !== 'Registration' && f.month !== 'Registration Fee');
+  const monthlyFeesHistory = studentFees.filter(f => f.feeType !== 'Registration' && !f.month.startsWith('Registration Fee'));
 
   // Total Paid & Outstanding Calculations
   const totalAmountPaid = studentFees.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);
@@ -627,7 +627,7 @@ export default function StudentPortal({
               </thead>
               <tbody className="divide-y divide-gray-100 font-medium">
                 {studentFees.map(f => {
-                  const isReg = f.feeType === 'Registration' || f.month === 'Registration Fee';
+                  const isReg = f.feeType === 'Registration' || f.month.startsWith('Registration Fee');
                   return (
                     <tr key={f.id} className="hover:bg-gray-50/60">
                       <td className="p-3 font-bold">

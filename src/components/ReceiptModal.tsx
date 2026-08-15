@@ -10,7 +10,7 @@ interface ReceiptModalProps {
 }
 
 export default function ReceiptModal({ fee, student, onClose }: ReceiptModalProps) {
-  const isRegistrationFee = fee.feeType === 'Registration' || fee.month === 'Registration Fee';
+  const isRegistrationFee = fee.feeType === 'Registration' || fee.month === 'Registration Fee' || fee.month.startsWith('Registration Fee');
   
   const receiptTitle = isRegistrationFee 
     ? 'Official Registration Fee Receipt' 
@@ -131,7 +131,7 @@ export default function ReceiptModal({ fee, student, onClose }: ReceiptModalProp
                 <span className="font-bold text-gray-800 block">
                   {isRegistrationFee 
                     ? (fee.amount === 0 
-                        ? 'One-Time Registration Admission (FREE - Inaugural Offer for First 15 Students)' 
+                        ? `One-Time Registration Admission (FREE - ${fee.month.includes('(') ? fee.month.split('(')[1].replace(')', '') : (fee.paymentMethod || 'Waived')})` 
                         : 'One-Time Registration Fee (₹350)')
                     : `Monthly Training Fee (${fee.month})`}
                 </span>
@@ -139,7 +139,7 @@ export default function ReceiptModal({ fee, student, onClose }: ReceiptModalProp
               <div>
                 <span className="text-[10px] text-gray-400 font-mono uppercase block">Settlement Status</span>
                 <span className="inline-flex items-center gap-1 font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-[10px]">
-                  <CheckCircle2 size={12} /> {fee.amount === 0 ? 'FREE INAUGURAL OFFER' : (fee.status === 'Paid' ? 'VERIFIED & PAID' : fee.status)}
+                  <CheckCircle2 size={12} /> {fee.amount === 0 ? 'FREE ADMISSION WAIVED' : (fee.status === 'Paid' ? 'VERIFIED & PAID' : fee.status)}
                 </span>
               </div>
             </div>

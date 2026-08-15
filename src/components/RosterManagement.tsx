@@ -1,18 +1,34 @@
 import React, { useState } from 'react';
-import { Student, PerformanceMetric } from '../types';
+import { Student, PerformanceMetric, FeeStatus } from '../types';
 import { db } from '../utils/db';
 import logo from '../assets/images/kssb_fc_official_logo.jpg';
-import { UserPlus, FileSpreadsheet, Search, Check, AlertCircle, Sparkles, X, Edit3, Phone, MapPin, User, ShieldCheck, Camera, Trash2, IdCard, Lock } from 'lucide-react';
+import { 
+  UserPlus, FileSpreadsheet, Search, Check, AlertCircle, Sparkles, X, Edit3, 
+  Phone, MapPin, User, ShieldCheck, Camera, Trash2, IdCard, Lock, CreditCard, 
+  Tag, CheckCircle2, Clock, FileText, ArrowLeft, LayoutGrid, List, Table as TableIcon,
+  ArrowUpDown, Filter, Eye, Award, CheckCircle
+} from 'lucide-react';
 import PlayerIDCardModal from './PlayerIDCardModal';
 import PassportPhotoCapture from './PassportPhotoCapture';
 import StudentAvatar from './StudentAvatar';
+import ReceiptModal from './ReceiptModal';
 import { calculateExactAge, formatDateToDDMMYYYY } from '../utils/dateUtils';
 
 interface RosterManagementProps {
   students: Student[];
   metrics: PerformanceMetric[];
+  fees?: FeeStatus[];
+  onUpdateFee?: (fee: FeeStatus) => void;
   userRole?: 'admin' | 'coach' | 'student';
-  onAddStudent: (student: Omit<Student, 'id' | 'registrationDate'>) => void;
+  onAddStudent: (
+    student: Omit<Student, 'id' | 'registrationDate'>,
+    regFeeConfig?: {
+      mode: 'Free' | 'Paid' | 'Pending';
+      freeCategory?: 'Special Child' | 'Members Child' | 'Coach Reference' | 'Members Reference' | 'Inaugural Free Offer';
+      paymentMethod?: string;
+      paymentDate?: string;
+    }
+  ) => void;
   onUpdateStudent?: (student: Student) => void;
   onDeleteStudent?: (studentId: string) => void;
   onAddMetric: (metric: Omit<PerformanceMetric, 'id'>) => void;
@@ -21,6 +37,8 @@ interface RosterManagementProps {
 export default function RosterManagement({
   students,
   metrics,
+  fees = [],
+  onUpdateFee,
   userRole = 'admin',
   onAddStudent,
   onUpdateStudent,
@@ -57,6 +75,25 @@ export default function RosterManagement({
   const [regPhotoUrl, setRegPhotoUrl] = useState<string>('');
   const [regAadharNumber, setRegAadharNumber] = useState('');
 
+  // Registration Fee payment options during enrolment
+  const isEligibleForInauguralOffer = students.length < 15;
+  const [regPaymentMode, setRegPaymentMode] = useState<'Free' | 'Paid' | 'Pending'>(() => isEligibleForInauguralOffer ? 'Free' : 'Paid');
+  const [regFreeCategory, setRegFreeCategory] = useState<'Special Child' | 'Members Child' | 'Coach Reference' | 'Members Reference' | 'Inaugural Free Offer'>(() => isEligibleForInauguralOffer ? 'Inaugural Free Offer' : 'Special Child');
+  const [regPaymentMethod, setRegPaymentMethod] = useState('Cash Handover');
+  const [regPaymentDate, setRegPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Quick Fee Settlement from Roster Table
+  const [quickEditingFee, setQuickEditingFee] = useState<FeeStatus | null>(null);
+  const [quickFeeStudent, setQuickFeeStudent] = useState<Student | null>(null);
+  const [quickSettleMode, setQuickSettleMode] = useState<'Paid' | 'Free' | 'Pending'>('Paid');
+  const [quickFreeCategory, setQuickFreeCategory] = useState<'Special Child' | 'Members Child' | 'Coach Reference' | 'Members Reference' | 'Inaugural Free Offer'>('Special Child');
+  const [quickPaymentMethod, setQuickPaymentMethod] = useState('Cash Handover');
+  const [quickPaymentDate, setQuickPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Receipt Modal State
+  const [selectedReceiptFee, setSelectedReceiptFee] = useState<FeeStatus | null>(null);
+  const [receiptStudent, setReceiptStudent] = useState<Student | null>(null);
+
   // Daily Metric Form State
   const [metricDate, setMetricDate] = useState(new Date().toISOString().split('T')[0]);
   const [metricSpeed, setMetricSpeed] = useState(5.0);
@@ -68,15 +105,126 @@ export default function RosterManagement({
   const [metricAttendance, setMetricAttendance] = useState<'Present' | 'Absent' | 'Excused'>('Present');
   const [metricNotes, setMetricNotes] = useState('');
 
-  // Search/Filters State
+  // Search/Filters & View Mode State
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPosFilter, setSelectedPosFilter] = useState('All');
+  const [viewMode, setViewMode] = useState<'compact' | 'table' | 'cards'>('compact');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc'); // 'asc' = #1 to #N (First registered to Till Date)
+  const [feeStatusFilter, setFeeStatusFilter] = useState<'All' | 'Paid' | 'Free' | 'Pending'>('All');
 
   // Notification Banner State
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Next sequential registration number calculation
   const nextRegFormatted = db.getNextRegistrationNumber();
+
+  // Helper to open quick settlement modal for a student's registration fee
+  const handleOpenQuickFeeModal = (student: Student, mode: 'Paid' | 'Free' | 'Pending', defaultCat?: 'Special Child' | 'Members Child' | 'Coach Reference' | 'Members Reference' | 'Inaugural Free Offer') => {
+    const studentRegFee = fees.find(f => f.studentId === student.id && (f.feeType === 'Registration' || f.month.startsWith('Registration Fee')));
+    const feeToEdit: FeeStatus = studentRegFee || {
+      id: 'f_reg_' + student.id + '_' + Date.now(),
+      studentId: student.id,
+      feeType: 'Registration',
+      month: 'Registration Fee',
+      amount: 350,
+      status: 'Pending'
+    };
+    
+    setQuickEditingFee(feeToEdit);
+    setQuickFeeStudent(student);
+    setQuickSettleMode(mode);
+    if (defaultCat) {
+      setQuickFreeCategory(defaultCat);
+    } else if (feeToEdit.month.includes('Special Child')) {
+      setQuickFreeCategory('Special Child');
+    } else if (feeToEdit.month.includes('Members Child')) {
+      setQuickFreeCategory('Members Child');
+    } else if (feeToEdit.month.includes('Coach Reference')) {
+      setQuickFreeCategory('Coach Reference');
+    } else if (feeToEdit.month.includes('Members Reference')) {
+      setQuickFreeCategory('Members Reference');
+    } else if (feeToEdit.month.includes('Inaugural Free Offer')) {
+      setQuickFreeCategory('Inaugural Free Offer');
+    } else {
+      setQuickFreeCategory('Special Child');
+    }
+    setQuickPaymentDate(feeToEdit.paymentDate || new Date().toISOString().split('T')[0]);
+    if (feeToEdit.paymentMethod && !feeToEdit.paymentMethod.startsWith('Waived')) {
+      setQuickPaymentMethod(feeToEdit.paymentMethod);
+    }
+  };
+
+  const handleSaveQuickFee = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickEditingFee || !onUpdateFee) return;
+
+    if (quickSettleMode === 'Free') {
+      let monthTitle = `Registration Fee (${quickFreeCategory})`;
+      let methodTitle = `Waived - ${quickFreeCategory}`;
+      let recPrefix = 'KSSB-FREE-SPECIAL-';
+
+      if (quickFreeCategory === 'Special Child') {
+        recPrefix = 'KSSB-FREE-SPECIAL-';
+      } else if (quickFreeCategory === 'Members Child') {
+        recPrefix = 'KSSB-FREE-MEMBERS-';
+      } else if (quickFreeCategory === 'Coach Reference') {
+        recPrefix = 'KSSB-FREE-COACH-';
+      } else if (quickFreeCategory === 'Members Reference') {
+        recPrefix = 'KSSB-FREE-MEM-REF-';
+      } else if (quickFreeCategory === 'Inaugural Free Offer') {
+        methodTitle = 'Inaugural Offer Waived (First 15 Students)';
+        recPrefix = 'KSSB-FREE-OFFER-';
+      }
+
+      const recNum = quickEditingFee.receiptNumber || (recPrefix + (quickFeeStudent?.registrationNumber ? quickFeeStudent.registrationNumber.replace(/[\/\s]/g, '-') : Math.floor(1000 + Math.random() * 9000)));
+
+      onUpdateFee({
+        ...quickEditingFee,
+        amount: 0,
+        status: 'Paid',
+        month: monthTitle,
+        paymentDate: quickPaymentDate,
+        paymentMethod: methodTitle,
+        receiptNumber: recNum
+      });
+      setAlert({
+        type: 'success',
+        message: `Marked Registration Fee as Free (${quickFreeCategory}) for ${quickFeeStudent?.name}!`
+      });
+    } else if (quickSettleMode === 'Paid') {
+      const recNum = quickEditingFee.receiptNumber || ('KSSB-REG-2026-' + (quickFeeStudent?.registrationNumber ? quickFeeStudent.registrationNumber.replace(/[\/\s]/g, '-') : Math.floor(1000 + Math.random() * 9000)));
+      onUpdateFee({
+        ...quickEditingFee,
+        amount: 350,
+        status: 'Paid',
+        month: 'Registration Fee',
+        paymentDate: quickPaymentDate,
+        paymentMethod: quickPaymentMethod,
+        receiptNumber: recNum
+      });
+      setAlert({
+        type: 'success',
+        message: `Marked Registration Fee (₹350) Paid for ${quickFeeStudent?.name}!`
+      });
+    } else {
+      onUpdateFee({
+        ...quickEditingFee,
+        amount: 350,
+        status: 'Pending',
+        month: 'Registration Fee',
+        paymentDate: undefined,
+        paymentMethod: undefined,
+        receiptNumber: undefined
+      });
+      setAlert({
+        type: 'success',
+        message: `Marked Registration Fee as Pending (₹350) for ${quickFeeStudent?.name}.`
+      });
+    }
+
+    setQuickEditingFee(null);
+    setQuickFeeStudent(null);
+  };
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,7 +288,12 @@ export default function RosterManagement({
       isGuardianAadhar: isUnder5
     };
 
-    onAddStudent(newStudentData);
+    onAddStudent(newStudentData, {
+      mode: regPaymentMode,
+      freeCategory: regPaymentMode === 'Free' ? regFreeCategory : undefined,
+      paymentMethod: regPaymentMode === 'Paid' ? regPaymentMethod : undefined,
+      paymentDate: regPaymentDate
+    });
 
     // Auto-generate Player ID Card popup for the newly registered player
     const createdStudent: Student = {
@@ -153,9 +306,15 @@ export default function RosterManagement({
     setIsAutoGeneratedNotice(true);
     setShowIdCardModal(true);
 
+    const feeMsg = regPaymentMode === 'Free' 
+      ? `Free Registration (${regFreeCategory})` 
+      : regPaymentMode === 'Paid' 
+        ? 'Paid Registration (₹350)' 
+        : 'Registration Fee Pending (₹350)';
+
     setAlert({ 
       type: 'success', 
-      message: `Successfully registered Student ${regName} (${regNum})! Aadhar No: ${regAadharNumber}` 
+      message: `Successfully registered Student ${regName} (${regNum}) with ${feeMsg}!` 
     });
 
     // Clear fields
@@ -223,15 +382,66 @@ export default function RosterManagement({
     setTimeout(() => setAlert(null), 5000);
   };
 
-  // Filter students
-  const filteredStudents = students.filter(student => {
-    const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (student.registrationNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (student.fatherName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (student.mobileNo || '').includes(searchTerm);
-    const matchesPosition = selectedPosFilter === 'All' || student.position === selectedPosFilter;
-    return matchesSearch && matchesPosition;
+  // Natural Registration Sequence Extraction Helper (1, 2, 3, etc.)
+  const parseRegistrationSeq = (s: Student): number => {
+    if (s.registrationNumber) {
+      const match = s.registrationNumber.match(/KSSBFC(\d+)\//i);
+      if (match && match[1]) {
+        const n = parseInt(match[1], 10);
+        if (!isNaN(n)) return n;
+      }
+    }
+    const idMatch = s.id.match(/^p(\d+)/i);
+    if (idMatch && idMatch[1]) {
+      const n = parseInt(idMatch[1], 10);
+      if (!isNaN(n)) return n;
+    }
+    if (s.registrationDate) {
+      const d = new Date(s.registrationDate).getTime();
+      if (!isNaN(d)) return d;
+    }
+    return 999999;
+  };
+
+  // Sort students strictly by registration sequence (First registered #1 to Till Date #N)
+  const sortedStudents = [...students].sort((a, b) => {
+    const seqA = parseRegistrationSeq(a);
+    const seqB = parseRegistrationSeq(b);
+    return sortOrder === 'asc' ? seqA - seqB : seqB - seqA;
   });
+
+  // Filter students
+  const filteredStudents = sortedStudents.filter(student => {
+    const term = searchTerm.toLowerCase().trim();
+    const matchesSearch = !term || 
+      student.name.toLowerCase().includes(term) || 
+      (student.registrationNumber || '').toLowerCase().includes(term) ||
+      (student.fatherName || '').toLowerCase().includes(term) ||
+      (student.motherName || '').toLowerCase().includes(term) ||
+      (student.mobileNo || '').includes(term) ||
+      (student.aadharNumber || '').includes(term) ||
+      (student.address || '').toLowerCase().includes(term);
+
+    const matchesPosition = selectedPosFilter === 'All' || student.position === selectedPosFilter;
+
+    const studentRegFee = fees.find(f => f.studentId === student.id && (f.feeType === 'Registration' || f.month.startsWith('Registration Fee')));
+    let matchesFee = true;
+    if (feeStatusFilter === 'Paid') {
+      matchesFee = !!(studentRegFee && studentRegFee.status === 'Paid' && studentRegFee.amount > 0);
+    } else if (feeStatusFilter === 'Free') {
+      matchesFee = !!(studentRegFee && studentRegFee.status === 'Paid' && studentRegFee.amount === 0);
+    } else if (feeStatusFilter === 'Pending') {
+      matchesFee = !studentRegFee || studentRegFee.status !== 'Paid';
+    }
+
+    return matchesSearch && matchesPosition && matchesFee;
+  });
+
+  // Registration Summary Statistics
+  const totalEnrolledAthletes = students.length;
+  const freeEnrolmentCount = fees.filter(f => (f.feeType === 'Registration' || f.month.startsWith('Registration Fee')) && f.status === 'Paid' && f.amount === 0).length;
+  const paidEnrolmentCount = fees.filter(f => (f.feeType === 'Registration' || f.month.startsWith('Registration Fee')) && f.status === 'Paid' && f.amount > 0).length;
+  const pendingEnrolmentCount = totalEnrolledAthletes - (freeEnrolmentCount + paidEnrolmentCount);
 
   return (
     <div className="space-y-6" id="roster-management-root">
@@ -504,7 +714,7 @@ export default function RosterManagement({
                   />
                 </div>
 
-                {/* Address */}
+                {/* Residential Address */}
                 <div className="space-y-1 col-span-1 sm:col-span-2">
                   <label className="text-[11px] sm:text-xs font-mono font-bold text-gray-700 uppercase tracking-wide block text-left">Residential Address *</label>
                   <input 
@@ -517,6 +727,136 @@ export default function RosterManagement({
                   />
                 </div>
 
+              </div>
+
+              {/* Registration Fee Payment & Free Admission Category Selector */}
+              <div className="p-4 bg-emerald-950/5 border border-emerald-900/20 rounded-2xl space-y-3.5 mt-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-emerald-900/10">
+                  <div className="flex items-center gap-2">
+                    <CreditCard size={18} className="text-emerald-700" />
+                    <div>
+                      <h4 className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                        Registration Fee Admission Status
+                      </h4>
+                      <p className="text-[11px] text-gray-500 font-medium">
+                        Select whether this registration is Free (Special/Members/Coach/Inaugural), Paid (₹350), or Pending.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="inline-flex items-center gap-1 px-2.5 py-1 bg-white rounded-lg border border-gray-200 text-[11px] font-mono font-black text-emerald-800 shrink-0">
+                    {regPaymentMode === 'Free' ? '₹0.00 (FREE WAIVER)' : regPaymentMode === 'Paid' ? '₹350.00 (PAID)' : '₹350.00 (PENDING)'}
+                  </div>
+                </div>
+
+                {/* Mode Selector */}
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRegPaymentMode('Free')}
+                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                      regPaymentMode === 'Free'
+                        ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm'
+                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="text-sm">🎁</span>
+                    <span>Free (₹0)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRegPaymentMode('Paid')}
+                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                      regPaymentMode === 'Paid'
+                        ? 'bg-emerald-800 text-white border-emerald-900 shadow-sm'
+                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="text-sm">💳</span>
+                    <span>Paid (₹350)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRegPaymentMode('Pending')}
+                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                      regPaymentMode === 'Pending'
+                        ? 'bg-amber-600 text-white border-amber-700 shadow-sm'
+                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="text-sm">⏳</span>
+                    <span>Pay Later</span>
+                  </button>
+                </div>
+
+                {/* If Free: Category Selection */}
+                {regPaymentMode === 'Free' && (
+                  <div className="p-3.5 bg-white rounded-xl border border-emerald-200 space-y-2.5 animate-fade-in">
+                    <label className="text-[11px] font-mono font-bold text-emerald-950 uppercase tracking-wide block">
+                      Select Free Registration Category / Reason:
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {[
+                        { key: 'Special Child', label: '🌟 Special Child', desc: '100% Free Registration Waiver' },
+                        { key: 'Members Child', label: '🏆 Members Child', desc: 'Club Member Privilege' },
+                        { key: 'Coach Reference', label: '⚽ Coach Reference', desc: 'Coach Recommended Athlete' },
+                        { key: 'Members Reference', label: '🤝 Members Reference', desc: 'Member Recommended' },
+                        { key: 'Inaugural Free Offer', label: '🎁 Inaugural Free Offer', desc: 'First 15 Students Privilege' }
+                      ].map((item) => (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => setRegFreeCategory(item.key as any)}
+                          className={`p-2.5 rounded-lg border text-left text-xs transition-all flex flex-col cursor-pointer ${
+                            regFreeCategory === item.key
+                              ? 'bg-emerald-50 border-emerald-500 text-emerald-950 ring-1 ring-emerald-500 font-bold'
+                              : 'border-gray-200 hover:bg-gray-50 text-gray-700'
+                          }`}
+                        >
+                          <span className="font-bold flex items-center justify-between">
+                            {item.label}
+                            {regFreeCategory === item.key && <Check size={14} className="text-emerald-700" />}
+                          </span>
+                          <span className="text-[10px] text-gray-500 font-normal">{item.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* If Paid: Payment Method & Date */}
+                {regPaymentMode === 'Paid' && (
+                  <div className="p-3.5 bg-white rounded-xl border border-emerald-200 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-fade-in">
+                    <div>
+                      <label className="text-[10px] font-mono font-bold text-gray-600 uppercase block mb-1">
+                        Payment Method
+                      </label>
+                      <select
+                        value={regPaymentMethod}
+                        onChange={(e) => setRegPaymentMethod(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-800"
+                      >
+                        <option value="Cash Handover">Cash Handover</option>
+                        <option value="UPI / GPay / PhonePe">UPI / GPay / PhonePe</option>
+                        <option value="Bank Transfer">Direct Bank Transfer</option>
+                        <option value="Credit/Debit Card">Credit/Debit Card</option>
+                        <option value="Check">Check / Cheque</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-mono font-bold text-gray-600 uppercase block mb-1">
+                        Payment Date
+                      </label>
+                      <input
+                        type="date"
+                        value={regPaymentDate}
+                        onChange={(e) => setRegPaymentDate(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-gray-800"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col-reverse sm:flex-row gap-2.5 sm:gap-3 justify-end pt-4 border-t border-gray-100">
@@ -824,206 +1164,318 @@ export default function RosterManagement({
         </div>
       )}
 
-      {/* Roster Table Filter Bars */}
-      <div className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm flex flex-col sm:flex-row gap-4 justify-between" id="roster-filters-card">
-        <div className="relative max-w-sm w-full">
-          <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input 
-            type="text" 
-            placeholder="Search by student, reg no, or mobile..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:bg-white"
-          />
+      {/* Registration Sequence & Summary Banner */}
+      <div className="bg-gradient-to-r from-emerald-900 via-slate-900 to-slate-950 p-4 sm:p-5 rounded-2xl border border-emerald-800/40 text-white shadow-md flex flex-col md:flex-row gap-4 items-start md:items-center justify-between" id="roster-sequence-banner">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-mono font-bold rounded-md flex items-center gap-1.5">
+              <Award size={13} className="text-amber-400" />
+              Registration Master Sequence
+            </span>
+            <span className="text-xs text-slate-300 font-mono">
+              Seq <strong className="text-emerald-400">#1</strong> to <strong className="text-emerald-400">#{totalEnrolledAthletes}</strong> (First Registered to Till-Date)
+            </span>
+          </div>
+          <h3 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
+            <span>KSSB FC Player Master Register</span>
+            <span className="text-xs font-normal px-2.5 py-0.5 bg-slate-800 border border-slate-700 text-slate-300 rounded-full font-mono">
+              {filteredStudents.length} of {totalEnrolledAthletes} Shown
+            </span>
+          </h3>
         </div>
-        
-        <div className="flex items-center gap-2 overflow-x-auto">
-          <span className="text-[11px] font-mono font-bold text-gray-500 uppercase shrink-0">Position:</span>
-          <div className="flex bg-gray-50 p-1 rounded-xl border border-gray-200 shrink-0">
+
+        {/* Quick Stat Badges */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="bg-slate-800/80 border border-slate-700/80 px-3 py-1.5 rounded-xl text-center">
+            <div className="text-[10px] text-slate-400 font-mono uppercase font-bold">Total Athletes</div>
+            <div className="text-base font-black text-white font-mono">{totalEnrolledAthletes}</div>
+          </div>
+          <div className="bg-emerald-950/80 border border-emerald-700/60 px-3 py-1.5 rounded-xl text-center">
+            <div className="text-[10px] text-emerald-400 font-mono uppercase font-bold">Free Reg</div>
+            <div className="text-base font-black text-emerald-300 font-mono">{freeEnrolmentCount}</div>
+          </div>
+          <div className="bg-emerald-900/60 border border-emerald-600/60 px-3 py-1.5 rounded-xl text-center">
+            <div className="text-[10px] text-emerald-300 font-mono uppercase font-bold">Paid Reg</div>
+            <div className="text-base font-black text-emerald-200 font-mono">{paidEnrolmentCount}</div>
+          </div>
+          <div className="bg-amber-950/80 border border-amber-700/60 px-3 py-1.5 rounded-xl text-center">
+            <div className="text-[10px] text-amber-400 font-mono uppercase font-bold">Pending</div>
+            <div className="text-base font-black text-amber-300 font-mono">{pendingEnrolmentCount}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Roster Controls & Filters Bar */}
+      <div className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm space-y-3" id="roster-filters-card">
+        <div className="flex flex-col lg:flex-row gap-3 lg:items-center justify-between">
+          {/* Search bar */}
+          <div className="relative flex-1 max-w-md">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input 
+              type="text" 
+              placeholder="Search by player name, reg no (e.g. 0001), parent, phone..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:bg-white"
+            />
+            {searchTerm && (
+              <button 
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer p-0.5"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Sequence Order & View Mode Toggles */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Sequence Sort Order */}
+            <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-200">
+              <button
+                onClick={() => setSortOrder('asc')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-all ${
+                  sortOrder === 'asc' ? 'bg-emerald-700 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                }`}
+                title="Registration Sequence: First registered #1 to Till Date #N"
+              >
+                <ArrowUpDown size={12} />
+                <span>#1 → #N (First to Date)</span>
+              </button>
+              <button
+                onClick={() => setSortOrder('desc')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-all ${
+                  sortOrder === 'desc' ? 'bg-emerald-700 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                }`}
+                title="Registration Sequence: Latest registered first"
+              >
+                <span>#N → #1 (Latest)</span>
+              </button>
+            </div>
+
+            {/* View Mode Switcher */}
+            <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-200">
+              <button
+                onClick={() => setViewMode('compact')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+                  viewMode === 'compact' ? 'bg-slate-900 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                }`}
+                title="Compact One-Page Master Roll Sheet (view all athletes at a glance without scrolling)"
+              >
+                <List size={14} />
+                <span className="hidden sm:inline">Compact Roll</span>
+                <span className="sm:hidden">Compact</span>
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+                  viewMode === 'table' ? 'bg-slate-900 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                }`}
+                title="Detailed Master Table"
+              >
+                <TableIcon size={14} />
+                <span>Table</span>
+              </button>
+              <button
+                onClick={() => setViewMode('cards')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+                  viewMode === 'cards' ? 'bg-slate-900 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                }`}
+                title="Athlete Cards View"
+              >
+                <LayoutGrid size={14} />
+                <span>Cards</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Second row: Filter chips for Position and Registration Fee Status */}
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between pt-2 border-t border-gray-100">
+          <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
+            <span className="text-[11px] font-mono font-bold text-gray-500 uppercase shrink-0">Position:</span>
             {['All', 'Goalkeeper', 'Defence', 'Midfield', 'Forward', 'Winger'].map(pos => (
               <button
                 key={pos}
                 onClick={() => setSelectedPosFilter(pos)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                  selectedPosFilter === pos ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                className={`px-2 py-0.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all shrink-0 ${
+                  selectedPosFilter === pos ? 'bg-emerald-700 text-white shadow-2xs' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
                 {pos}
               </button>
             ))}
           </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
+            <span className="text-[11px] font-mono font-bold text-gray-500 uppercase shrink-0">Reg. Fee:</span>
+            {[
+              { id: 'All', label: 'All' },
+              { id: 'Free', label: `Free (${freeEnrolmentCount})` },
+              { id: 'Paid', label: `Paid (${paidEnrolmentCount})` },
+              { id: 'Pending', label: `Pending (${pendingEnrolmentCount})` }
+            ].map(f => (
+              <button
+                key={f.id}
+                onClick={() => setFeeStatusFilter(f.id as any)}
+                className={`px-2 py-0.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all shrink-0 ${
+                  feeStatusFilter === f.id ? 'bg-slate-900 text-white shadow-2xs' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Roster Records Grid/Table */}
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4 sm:p-0 sm:overflow-hidden" id="roster-table-card">
-        {/* Mobile Vertical Cards View */}
-        <div className="block sm:hidden space-y-3">
-          {filteredStudents.length > 0 ? (
-            filteredStudents.map(student => (
-              <div key={student.id} className="p-4 bg-gray-50/70 border border-gray-200 rounded-2xl space-y-3">
-                <div className="flex justify-between items-start gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <StudentAvatar photoUrl={student.photoUrl} name={student.name} size="md" />
-                    <div>
-                      <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md inline-block mb-0.5">
-                        {student.registrationNumber || 'KSSBFC0001/26-27'}
-                      </span>
-                      <div className="font-bold text-gray-900 text-base">{student.name}</div>
-                    </div>
-                  </div>
-                  <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-50 text-emerald-900 border border-emerald-200 shrink-0">
-                    {student.position}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs bg-white p-3 rounded-xl border border-gray-100">
-                  <div>
-                    <span className="text-[10px] text-gray-400 font-mono uppercase block">Father / Guardian</span>
-                    <span className="font-bold text-gray-800">{student.fatherName || student.parentName || '—'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-gray-400 font-mono uppercase block">DOB / Calculated Age</span>
-                    <span className="font-mono font-bold text-emerald-800">
-                      {student.dob ? `${formatDateToDDMMYYYY(student.dob)} (${calculateExactAge(student.dob, student.age).displayText})` : `${student.age} Yrs`}
-                    </span>
-                  </div>
-                </div>
-
-                {student.address && (
-                  <div className="text-xs text-gray-600 bg-white/60 p-2.5 rounded-xl border border-gray-100 flex items-start gap-1.5">
-                    <MapPin size={13} className="text-gray-400 shrink-0 mt-0.5" />
-                    <span className="break-words">{student.address}</span>
-                  </div>
-                )}
-
-                {/* Card Actions */}
-                <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-200/80">
-                  <button 
-                    onClick={() => {
-                      setIdCardStudent(student);
-                      setIsAutoGeneratedNotice(false);
-                      setShowIdCardModal(true);
-                    }}
-                    className="flex-1 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <IdCard size={13} />
-                    ID Card
-                  </button>
-                  {userRole === 'admin' && (
-                    <>
-                      <button 
-                        onClick={() => {
-                          setEditingStudent(student);
-                          setShowEditForm(true);
-                        }}
-                        className="py-2 px-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
-                      >
-                        <Edit3 size={13} />
-                        Edit
-                      </button>
-                      <button 
-                        onClick={() => setDeletingStudent(student)}
-                        className="py-2 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
-                        title="Delete Player Profile (Admin Only)"
-                      >
-                        <Trash2 size={13} />
-                        Delete
-                      </button>
-                    </>
-                  )}
-                  <button 
-                    onClick={() => {
-                      setSelectedStudent(student);
-                      setShowMetricForm(true);
-                    }}
-                    className="py-2 px-3 bg-gray-900 text-white hover:bg-gray-800 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <FileSpreadsheet size={13} />
-                    Drills
-                  </button>
-                </div>
+      {/* Roster Records Container */}
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden" id="roster-table-card">
+        
+        {/* VIEW MODE 1: COMPACT ONE-PAGE MASTER ROLL REGISTER (Default) */}
+        {viewMode === 'compact' && (
+          <div>
+            <div className="p-3 bg-slate-900 text-white flex items-center justify-between px-4 text-xs">
+              <div className="flex items-center gap-2 font-mono">
+                <Award size={14} className="text-amber-400" />
+                <span className="font-bold">ALL-IN-ONE REGISTRATION MASTER REGISTER</span>
+                <span className="text-[11px] text-slate-400">({filteredStudents.length} Athletes Listed in Sequence)</span>
               </div>
-            ))
-          ) : (
-            <div className="text-center py-8 text-gray-500 text-xs">
-              No matching student profiles found.
+              <div className="text-[11px] text-slate-300 font-mono hidden md:block">
+                Showing Seq #1 to Till-Date Registered Players
+              </div>
             </div>
-          )}
-        </div>
 
-        {/* Desktop Table View */}
-        <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50/75 border-b border-gray-100">
-                <th className="p-4 text-xs font-mono font-bold text-gray-500 uppercase">Reg. Number & Student</th>
-                <th className="p-4 text-xs font-mono font-bold text-gray-500 uppercase">Position & Age</th>
-                <th className="p-4 text-xs font-mono font-bold text-gray-500 uppercase">Parents & Contact</th>
-                <th className="p-4 text-xs font-mono font-bold text-gray-500 uppercase">Address</th>
-                <th className="p-4 text-xs font-mono font-bold text-gray-500 uppercase text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filteredStudents.length > 0 ? (
-                filteredStudents.map(student => (
-                  <tr key={student.id} className="hover:bg-emerald-50/20 transition-colors">
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <StudentAvatar photoUrl={student.photoUrl} name={student.name} size="md" />
-                        <div>
-                          <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md inline-block mb-0.5">
-                            {student.registrationNumber || 'KSSBFC0001/26-27'}
-                          </span>
-                          <div className="font-bold text-gray-900 text-sm">{student.name}</div>
+            {filteredStudents.length > 0 ? (
+              <div className="divide-y divide-gray-100">
+                {filteredStudents.map((student, idx) => {
+                  const studentRegFee = fees.find(f => f.studentId === student.id && (f.feeType === 'Registration' || f.month.startsWith('Registration Fee')));
+                  const seqNum = parseRegistrationSeq(student);
+                  
+                  return (
+                    <div 
+                      key={student.id} 
+                      className="p-3 sm:px-4 hover:bg-emerald-50/30 transition-colors flex flex-col md:flex-row gap-3 md:items-center justify-between"
+                    >
+                      {/* Left: Sequence Badge + Student Info */}
+                      <div className="flex items-center gap-3 min-w-[280px]">
+                        {/* Chronological Sequence Roll Badge */}
+                        <div className="shrink-0 flex flex-col items-center justify-center w-9 h-9 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-900 font-mono font-black text-xs shadow-2xs">
+                          <span className="text-[8px] uppercase tracking-tighter text-emerald-700 leading-none">SEQ</span>
+                          <span className="leading-tight">#{seqNum < 999999 ? seqNum : idx + 1}</span>
+                        </div>
+
+                        <StudentAvatar photoUrl={student.photoUrl} name={student.name} size="sm" />
+
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-gray-900 text-sm leading-tight">{student.name}</span>
+                            <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded">
+                              {student.registrationNumber || 'KSSBFC0001/26-27'}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                              {student.position}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-gray-500 flex items-center gap-2">
+                            <span>Age: <strong className="text-gray-800 font-mono">{calculateExactAge(student.dob, student.age).displayText}</strong></span>
+                            {student.dob && <span>• DOB: <strong className="font-mono text-gray-700">{formatDateToDDMMYYYY(student.dob)}</strong></span>}
+                          </div>
                         </div>
                       </div>
-                    </td>
-                    <td className="p-4">
-                      <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-50 text-emerald-900 border border-emerald-200 inline-block mb-1">
-                        {student.position}
-                      </span>
-                      <div className="text-[11px] text-gray-800 font-bold">
-                        Age: {calculateExactAge(student.dob, student.age).displayText}
-                      </div>
-                      {student.dob && (
-                        <div className="text-[10px] font-mono text-gray-500">
-                          DOB: {formatDateToDDMMYYYY(student.dob)}
+
+                      {/* Middle: Parent, Phone, Address & Registration Fee Status */}
+                      <div className="flex flex-wrap items-center gap-3 text-xs md:justify-center">
+                        {/* Parent & Contact */}
+                        <div className="min-w-[150px] space-y-0.5">
+                          <div className="text-[11px] text-gray-700 truncate">
+                            <span className="text-gray-400 font-mono text-[10px]">F:</span> {student.fatherName || student.parentName || '—'}
+                          </div>
+                          {(student.mobileNo || student.parentPhone) && (
+                            <a 
+                              href={`tel:${student.mobileNo || student.parentPhone}`}
+                              className="text-[11px] font-mono text-emerald-700 font-bold hover:underline flex items-center gap-1"
+                            >
+                              <Phone size={10} />
+                              {student.mobileNo || student.parentPhone}
+                            </a>
+                          )}
                         </div>
-                      )}
-                    </td>
-                    <td className="p-4 text-xs">
-                      <div className="font-bold text-gray-800 flex items-center gap-1">
-                        <User size={12} className="text-gray-400" />
-                        <span>F: {student.fatherName || student.parentName || '—'}</span>
+
+                        {/* Registration Fee Badge */}
+                        <div className="min-w-[140px]">
+                          {studentRegFee && studentRegFee.status === 'Paid' ? (
+                            studentRegFee.amount === 0 ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                                <CheckCircle2 size={11} className="text-emerald-700" />
+                                FREE ({studentRegFee.month.includes('(') ? studentRegFee.month.split('(')[1].replace(')', '') : 'Waived'})
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-700 text-white shadow-2xs">
+                                <CheckCircle2 size={11} />
+                                PAID ₹350
+                              </span>
+                            )
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                              <Clock size={11} className="text-amber-700" />
+                              PENDING (₹350)
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      {student.motherName && (
-                        <div className="text-gray-500 text-[11px]">M: {student.motherName}</div>
-                      )}
-                      <div className="font-mono text-emerald-700 font-bold mt-0.5 flex items-center gap-1">
-                        <Phone size={11} />
-                        <span>{student.mobileNo || student.parentPhone}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 text-xs text-gray-600 max-w-xs truncate">
-                      <div className="flex items-start gap-1">
-                        <MapPin size={12} className="text-gray-400 shrink-0 mt-0.5" />
-                        <span className="truncate">{student.address || '—'}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
+
+                      {/* Right: Quick Actions */}
+                      <div className="flex items-center gap-1.5 justify-end shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100">
+                        {/* Quick Fee Settlement */}
+                        {userRole === 'admin' && (
+                          (!studentRegFee || studentRegFee.status !== 'Paid') ? (
+                            <button 
+                              onClick={() => handleOpenQuickFeeModal(student, 'Paid')}
+                              className="px-2 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-bold shadow-2xs transition-all inline-flex items-center gap-1 cursor-pointer"
+                              title="Mark Registration Fee Paid (₹350)"
+                            >
+                              <CreditCard size={11} />
+                              <span>Paid</span>
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => handleOpenQuickFeeModal(student, studentRegFee.amount === 0 ? 'Free' : 'Paid')}
+                              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg text-[11px] font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
+                              title="Change Registration Fee Status"
+                            >
+                              <Edit3 size={11} />
+                              <span>Status</span>
+                            </button>
+                          )
+                        )}
+
+                        {studentRegFee && studentRegFee.status === 'Paid' && (
+                          <button 
+                            onClick={() => {
+                              setSelectedReceiptFee(studentRegFee);
+                              setReceiptStudent(student);
+                            }}
+                            className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                            title="Receipt"
+                          >
+                            <FileText size={13} />
+                          </button>
+                        )}
+
                         <button 
                           onClick={() => {
                             setIdCardStudent(student);
                             setIsAutoGeneratedNotice(false);
                             setShowIdCardModal(true);
                           }}
-                          className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold shadow-sm transition-all inline-flex items-center gap-1 cursor-pointer"
+                          className="px-2 py-1 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-[11px] font-bold shadow-2xs transition-all inline-flex items-center gap-1 cursor-pointer"
+                          title="Generate Official Player ID Card"
                         >
-                          <IdCard size={13} />
-                          ID Card
+                          <IdCard size={12} />
+                          <span>ID</span>
                         </button>
+
                         {userRole === 'admin' && (
                           <>
                             <button 
@@ -1031,52 +1483,426 @@ export default function RosterManagement({
                                 setEditingStudent(student);
                                 setShowEditForm(true);
                               }}
-                              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold shadow-sm transition-all inline-flex items-center gap-1 cursor-pointer"
+                              className="p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
+                              title="Edit Athlete Profile"
                             >
                               <Edit3 size={13} />
-                              Edit Profile
                             </button>
                             <button 
                               onClick={() => setDeletingStudent(student)}
-                              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all inline-flex items-center gap-1 cursor-pointer"
-                              title="Delete Player Profile (Admin Only)"
+                              className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
+                              title="Delete Athlete Record"
                             >
                               <Trash2 size={13} />
-                              Delete
                             </button>
                           </>
                         )}
+
                         <button 
                           onClick={() => {
                             setSelectedStudent(student);
                             setShowMetricForm(true);
                           }}
-                          className="px-3 py-1.5 bg-gray-900 text-white hover:bg-gray-800 rounded-lg text-xs font-bold shadow-sm transition-all inline-flex items-center gap-1 cursor-pointer"
+                          className="p-1.5 bg-gray-900 text-white hover:bg-gray-800 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                          title="Log Performance Drills"
                         >
                           <FileSpreadsheet size={13} />
-                          Log Drills
                         </button>
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-500 p-4">
+                <p className="text-sm font-semibold text-gray-700">No student profiles match your search criteria.</p>
+                <p className="text-xs text-gray-400 mt-1">Try resetting the search bar or position/fee filter above.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* VIEW MODE 2: DETAILED TABLE VIEW */}
+        {viewMode === 'table' && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/75 border-b border-gray-100">
+                  <th className="p-3.5 text-xs font-mono font-bold text-gray-500 uppercase"># Seq</th>
+                  <th className="p-3.5 text-xs font-mono font-bold text-gray-500 uppercase">Reg. Number & Student</th>
+                  <th className="p-3.5 text-xs font-mono font-bold text-gray-500 uppercase">Position & Age</th>
+                  <th className="p-3.5 text-xs font-mono font-bold text-gray-500 uppercase">Registration Fee Status</th>
+                  <th className="p-3.5 text-xs font-mono font-bold text-gray-500 uppercase">Parents & Contact</th>
+                  <th className="p-3.5 text-xs font-mono font-bold text-gray-500 uppercase">Address</th>
+                  <th className="p-3.5 text-xs font-mono font-bold text-gray-500 uppercase text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 text-xs">
+                {filteredStudents.length > 0 ? (
+                  filteredStudents.map((student, idx) => {
+                    const studentRegFee = fees.find(f => f.studentId === student.id && (f.feeType === 'Registration' || f.month.startsWith('Registration Fee')));
+                    const seqNum = parseRegistrationSeq(student);
+
+                    return (
+                      <tr key={student.id} className="hover:bg-emerald-50/20 transition-colors">
+                        <td className="p-3.5 font-mono font-black text-emerald-800">
+                          <span className="px-2 py-1 bg-emerald-50 border border-emerald-200 rounded-md">
+                            #{seqNum < 999999 ? seqNum : idx + 1}
+                          </span>
+                        </td>
+                        <td className="p-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <StudentAvatar photoUrl={student.photoUrl} name={student.name} size="sm" />
+                            <div>
+                              <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded inline-block mb-0.5">
+                                {student.registrationNumber || 'KSSBFC0001/26-27'}
+                              </span>
+                              <div className="font-bold text-gray-900 text-sm">{student.name}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-3.5">
+                          <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-900 border border-emerald-200 inline-block mb-1">
+                            {student.position}
+                          </span>
+                          <div className="text-[11px] text-gray-800 font-bold">
+                            Age: {calculateExactAge(student.dob, student.age).displayText}
+                          </div>
+                          {student.dob && (
+                            <div className="text-[10px] font-mono text-gray-500">
+                              DOB: {formatDateToDDMMYYYY(student.dob)}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="p-3.5">
+                          {studentRegFee && studentRegFee.status === 'Paid' ? (
+                            <div className="space-y-0.5">
+                              {studentRegFee.amount === 0 ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                                  <CheckCircle2 size={11} className="text-emerald-700" />
+                                  FREE ({studentRegFee.month.includes('(') ? studentRegFee.month.split('(')[1].replace(')', '') : 'Waived'})
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-700 text-white shadow-2xs">
+                                  <CheckCircle2 size={11} />
+                                  PAID ₹350
+                                </span>
+                              )}
+                              {studentRegFee.paymentDate && (
+                                <div className="text-[10px] font-mono text-gray-500">
+                                  {studentRegFee.paymentDate}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                              <Clock size={11} className="text-amber-700" />
+                              PENDING (₹350)
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="p-3.5">
+                          <div className="font-bold text-gray-800 flex items-center gap-1">
+                            <User size={11} className="text-gray-400" />
+                            <span>F: {student.fatherName || student.parentName || '—'}</span>
+                          </div>
+                          {student.motherName && (
+                            <div className="text-gray-500 text-[11px]">M: {student.motherName}</div>
+                          )}
+                          <div className="font-mono text-emerald-700 font-bold mt-0.5 flex items-center gap-1">
+                            <Phone size={11} />
+                            <span>{student.mobileNo || student.parentPhone}</span>
+                          </div>
+                        </td>
+
+                        <td className="p-3.5 text-gray-600 max-w-xs truncate">
+                          <div className="flex items-start gap-1">
+                            <MapPin size={11} className="text-gray-400 shrink-0 mt-0.5" />
+                            <span className="truncate">{student.address || '—'}</span>
+                          </div>
+                        </td>
+
+                        <td className="p-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                            {userRole === 'admin' && (
+                              (!studentRegFee || studentRegFee.status !== 'Paid') ? (
+                                <button 
+                                  onClick={() => handleOpenQuickFeeModal(student, 'Paid')}
+                                  className="px-2 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold shadow-2xs transition-all inline-flex items-center gap-1 cursor-pointer"
+                                  title="Mark Paid (₹350)"
+                                >
+                                  <CreditCard size={11} />
+                                  <span>Paid</span>
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => handleOpenQuickFeeModal(student, studentRegFee.amount === 0 ? 'Free' : 'Paid')}
+                                  className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
+                                  title="Change Status"
+                                >
+                                  <Edit3 size={11} />
+                                  <span>Change</span>
+                                </button>
+                              )
+                            )}
+
+                            {studentRegFee && studentRegFee.status === 'Paid' && (
+                              <button 
+                                onClick={() => {
+                                  setSelectedReceiptFee(studentRegFee);
+                                  setReceiptStudent(student);
+                                }}
+                                className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold shadow-2xs transition-all inline-flex items-center gap-1 cursor-pointer"
+                                title="Receipt"
+                              >
+                                <FileText size={11} />
+                                <span>Receipt</span>
+                              </button>
+                            )}
+
+                            <button 
+                              onClick={() => {
+                                setIdCardStudent(student);
+                                setIsAutoGeneratedNotice(false);
+                                setShowIdCardModal(true);
+                              }}
+                              className="px-2 py-1 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold shadow-2xs transition-all inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <IdCard size={11} />
+                              <span>ID Card</span>
+                            </button>
+
+                            {userRole === 'admin' && (
+                              <>
+                                <button 
+                                  onClick={() => {
+                                    setEditingStudent(student);
+                                    setShowEditForm(true);
+                                  }}
+                                  className="p-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold shadow-2xs transition-all inline-flex items-center cursor-pointer"
+                                  title="Edit Profile"
+                                >
+                                  <Edit3 size={12} />
+                                </button>
+                                <button 
+                                  onClick={() => setDeletingStudent(student)}
+                                  className="p-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-2xs transition-all inline-flex items-center cursor-pointer"
+                                  title="Delete Profile"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </>
+                            )}
+
+                            <button 
+                              onClick={() => {
+                                setSelectedStudent(student);
+                                setShowMetricForm(true);
+                              }}
+                              className="p-1 bg-gray-900 text-white hover:bg-gray-800 rounded-lg text-xs font-bold shadow-2xs transition-all inline-flex items-center cursor-pointer"
+                              title="Drills"
+                            >
+                              <FileSpreadsheet size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="text-center py-12 text-gray-500">
+                      No matching student profiles found.
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={5} className="text-center py-12 text-gray-500">
-                    <div className="space-y-2 max-w-sm mx-auto">
-                      <p className="text-sm font-semibold text-gray-700">No student profiles found.</p>
-                      {userRole === 'admin' ? (
-                        <p className="text-xs text-gray-400">Click <strong className="text-emerald-700">+ New Student Registration</strong> above to register student athletes.</p>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* VIEW MODE 3: FULL ATHLETE CARDS VIEW */}
+        {viewMode === 'cards' && (
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredStudents.length > 0 ? (
+              filteredStudents.map((student, idx) => {
+                const studentRegFee = fees.find(f => f.studentId === student.id && (f.feeType === 'Registration' || f.month.startsWith('Registration Fee')));
+                const seqNum = parseRegistrationSeq(student);
+
+                return (
+                  <div key={student.id} className="p-4 bg-gray-50/70 border border-gray-200 rounded-2xl space-y-3 shadow-2xs">
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <StudentAvatar photoUrl={student.photoUrl} name={student.name} size="md" />
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className="text-[9px] font-mono font-black text-white bg-emerald-800 px-1.5 py-0.2 rounded">
+                              SEQ #{seqNum < 999999 ? seqNum : idx + 1}
+                            </span>
+                            <span className="text-[10px] font-mono font-bold text-emerald-900 bg-emerald-100 px-1.5 py-0.2 rounded">
+                              {student.registrationNumber || 'KSSBFC0001/26-27'}
+                            </span>
+                          </div>
+                          <div className="font-bold text-gray-900 text-base">{student.name}</div>
+                        </div>
+                      </div>
+                      <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-50 text-emerald-900 border border-emerald-200 shrink-0">
+                        {student.position}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-white p-3 rounded-xl border border-gray-100">
+                      <div>
+                        <span className="text-[10px] text-gray-400 font-mono uppercase block">Father / Guardian</span>
+                        <span className="font-bold text-gray-800 truncate block">{student.fatherName || student.parentName || '—'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-gray-400 font-mono uppercase block">DOB / Age</span>
+                        <span className="font-mono font-bold text-emerald-800">
+                          {student.dob ? `${formatDateToDDMMYYYY(student.dob)} (${calculateExactAge(student.dob, student.age).displayText})` : `${student.age} Yrs`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Registration Fee Status */}
+                    <div className="p-2.5 bg-white rounded-xl border border-gray-200/80 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-xs font-mono">
+                        <CreditCard size={14} className="text-emerald-700 shrink-0" />
+                        <span className="text-[10px] text-gray-500 font-bold uppercase">Reg. Fee:</span>
+                      </div>
+                      {studentRegFee ? (
+                        studentRegFee.status === 'Paid' ? (
+                          studentRegFee.amount === 0 ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                              <CheckCircle2 size={11} className="text-emerald-700" />
+                              FREE ({studentRegFee.month.includes('(') ? studentRegFee.month.split('(')[1].replace(')', '') : 'Waived'})
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-700 text-white">
+                              <CheckCircle2 size={11} />
+                              PAID ₹350
+                            </span>
+                          )
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                            <Clock size={11} className="text-amber-700" />
+                            PENDING ₹350
+                          </span>
+                        )
                       ) : (
-                        <p className="text-xs text-gray-400">Please ask Admin to register student profiles.</p>
+                        <span className="text-[10px] font-mono text-gray-400">—</span>
                       )}
                     </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+
+                    {student.address && (
+                      <div className="text-xs text-gray-600 bg-white/60 p-2.5 rounded-xl border border-gray-100 flex items-start gap-1.5">
+                        <MapPin size={13} className="text-gray-400 shrink-0 mt-0.5" />
+                        <span className="break-words line-clamp-1">{student.address}</span>
+                      </div>
+                    )}
+
+                    {/* Card Actions */}
+                    <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200/80">
+                      {userRole === 'admin' && (
+                        (!studentRegFee || studentRegFee.status !== 'Paid') ? (
+                          <>
+                            <button 
+                              onClick={() => handleOpenQuickFeeModal(student, 'Paid')}
+                              className="flex-1 py-1.5 px-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <CreditCard size={12} />
+                              Mark Paid
+                            </button>
+                            <button 
+                              onClick={() => handleOpenQuickFeeModal(student, 'Free')}
+                              className="flex-1 py-1.5 px-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer border border-amber-400"
+                            >
+                              <Tag size={12} />
+                              Mark Free
+                            </button>
+                          </>
+                        ) : (
+                          <button 
+                            onClick={() => handleOpenQuickFeeModal(student, studentRegFee.amount === 0 ? 'Free' : 'Paid')}
+                            className="py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                            title="Edit / Change Fee Status"
+                          >
+                            <Edit3 size={12} />
+                            Change
+                          </button>
+                        )
+                      )}
+
+                      {studentRegFee && studentRegFee.status === 'Paid' && (
+                        <button 
+                          onClick={() => {
+                            setSelectedReceiptFee(studentRegFee);
+                            setReceiptStudent(student);
+                          }}
+                          className="py-1.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold shadow-2xs transition-all flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <FileText size={12} />
+                          Receipt
+                        </button>
+                      )}
+
+                      <button 
+                        onClick={() => {
+                          setIdCardStudent(student);
+                          setIsAutoGeneratedNotice(false);
+                          setShowIdCardModal(true);
+                        }}
+                        className="py-1.5 px-3 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <IdCard size={12} />
+                        ID Card
+                      </button>
+
+                      {userRole === 'admin' && (
+                        <>
+                          <button 
+                            onClick={() => {
+                              setEditingStudent(student);
+                              setShowEditForm(true);
+                            }}
+                            className="py-1.5 px-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
+                          >
+                            <Edit3 size={12} />
+                            Edit
+                          </button>
+                          <button 
+                            onClick={() => setDeletingStudent(student)}
+                            className="py-1.5 px-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
+                            title="Delete Record"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </>
+                      )}
+
+                      <button 
+                        onClick={() => {
+                          setSelectedStudent(student);
+                          setShowMetricForm(true);
+                        }}
+                        className="py-1.5 px-2.5 bg-gray-900 text-white hover:bg-gray-800 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <FileSpreadsheet size={12} />
+                        Drills
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="col-span-full text-center py-12 text-gray-500 text-xs">
+                No matching student profiles found.
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Auto-generated / On-Demand Player ID Card Modal */}
@@ -1183,6 +2009,228 @@ export default function RosterManagement({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Quick Registration Fee Settlement Modal */}
+      {quickEditingFee && quickFeeStudent && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto transition-all" id="quick-fee-settle-modal">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative my-8 border border-emerald-100 animate-fade-in">
+            <button 
+              type="button"
+              onClick={() => { setQuickEditingFee(null); setQuickFeeStudent(null); }}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+              <div className="p-3 bg-emerald-100 text-emerald-800 rounded-2xl shrink-0">
+                <CreditCard size={24} />
+              </div>
+              <div>
+                <span className="text-[10px] font-mono font-bold text-emerald-700 uppercase tracking-wider block">Registration Fee Settlement</span>
+                <h3 className="text-lg font-black text-gray-900">{quickFeeStudent.name}</h3>
+                <p className="text-xs text-gray-500 font-mono">Reg No: {quickFeeStudent.registrationNumber || 'N/A'}</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveQuickFee} className="space-y-4">
+              {/* Settle Mode Switcher */}
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setQuickSettleMode('Free')}
+                  className={`py-2.5 px-2 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                    quickSettleMode === 'Free'
+                      ? 'bg-amber-500 text-slate-950 border-amber-600 shadow-sm'
+                      : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                  }`}
+                >
+                  <span className="text-sm">🎁</span>
+                  <span>Free (₹0)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setQuickSettleMode('Paid')}
+                  className={`py-2.5 px-2 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                    quickSettleMode === 'Paid'
+                      ? 'bg-emerald-700 text-white border-emerald-800 shadow-sm'
+                      : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                  }`}
+                >
+                  <span className="text-sm">💳</span>
+                  <span>Paid (₹350)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setQuickSettleMode('Pending')}
+                  className={`py-2.5 px-2 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                    quickSettleMode === 'Pending'
+                      ? 'bg-amber-600 text-white border-amber-700 shadow-sm'
+                      : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                  }`}
+                >
+                  <span className="text-sm">⏳</span>
+                  <span>Pay Later</span>
+                </button>
+              </div>
+
+              {/* Free Category Selector */}
+              {quickSettleMode === 'Free' && (() => {
+                const sortedStuds = [...students].sort((a, b) => {
+                  if (a.registrationNumber && b.registrationNumber) {
+                    const matchA = a.registrationNumber.match(/KSSBFC(\d+)\//i);
+                    const matchB = b.registrationNumber.match(/KSSBFC(\d+)\//i);
+                    if (matchA && matchB) {
+                      return parseInt(matchA[1], 10) - parseInt(matchB[1], 10);
+                    }
+                  }
+                  return (a.registrationDate || '').localeCompare(b.registrationDate || '');
+                });
+                const studentIndex = sortedStuds.findIndex(s => s.id === quickFeeStudent.id);
+                const isStudentInFirst15 = studentIndex !== -1 && studentIndex < 15;
+
+                return (
+                  <div className="p-4 bg-amber-50/70 rounded-2xl border border-amber-200 space-y-3">
+                    <label className="text-[11px] font-mono font-bold text-amber-950 uppercase tracking-wide block">
+                      Select Free Waiver Category:
+                    </label>
+                    <div className="space-y-2">
+                      {[
+                        { key: 'Special Child', label: '🌟 Special Child', desc: '100% Free Registration Waiver', disabled: false },
+                        { key: 'Members Child', label: '🏆 Members Child', desc: 'Club Member Privilege', disabled: false },
+                        { key: 'Coach Reference', label: '⚽ Coach Reference', desc: 'Coach Recommended Athlete', disabled: false },
+                        { key: 'Members Reference', label: '🤝 Members Reference', desc: 'Member Recommended', disabled: false },
+                        { 
+                          key: 'Inaugural Free Offer', 
+                          label: '🎁 Inaugural Free Offer', 
+                          desc: isStudentInFirst15 ? `First 15 Offer (Student #${studentIndex + 1})` : 'Offer Expired (Limit 15 Reached)', 
+                          disabled: !isStudentInFirst15 
+                        }
+                      ].map(item => (
+                        <button
+                          key={item.key}
+                          type="button"
+                          disabled={item.disabled}
+                          onClick={() => setQuickFreeCategory(item.key as any)}
+                          className={`w-full p-3 rounded-xl border text-left text-xs transition-all flex items-center justify-between ${
+                            item.disabled 
+                              ? 'opacity-40 bg-gray-100 border-gray-200 cursor-not-allowed text-gray-400' 
+                              : quickFreeCategory === item.key
+                                ? 'bg-white border-amber-500 text-amber-950 ring-2 ring-amber-400/50 font-bold shadow-xs cursor-pointer'
+                                : 'bg-white/80 border-amber-200/80 text-gray-700 hover:bg-white cursor-pointer'
+                          }`}
+                        >
+                          <div>
+                            <div className="font-bold">{item.label}</div>
+                            <div className="text-[10px] text-gray-500 font-normal">{item.desc}</div>
+                          </div>
+                          {quickFreeCategory === item.key && !item.disabled && <CheckCircle2 size={18} className="text-amber-700 shrink-0" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Paid Details */}
+              {quickSettleMode === 'Paid' && (
+                <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-200 space-y-3">
+                  <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-emerald-100">
+                    <span className="text-xs font-mono text-gray-600 font-bold">Standard Amount:</span>
+                    <span className="text-lg font-black text-emerald-800 font-mono">₹350.00</span>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-mono font-bold text-gray-600 uppercase block mb-1">
+                      Payment Mode
+                    </label>
+                    <select
+                      value={quickPaymentMethod}
+                      onChange={(e) => setQuickPaymentMethod(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800"
+                    >
+                      <option value="Cash Handover">Cash Handover</option>
+                      <option value="UPI / GPay / PhonePe">UPI / GPay / PhonePe</option>
+                      <option value="Bank Transfer">Bank Transfer</option>
+                      <option value="Credit/Debit Card">Credit/Debit Card</option>
+                      <option value="Check">Check / Cheque</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Pending Details */}
+              {quickSettleMode === 'Pending' && (
+                <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-200 space-y-2">
+                  <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-amber-100">
+                    <span className="text-xs font-mono text-gray-600 font-bold">Pending Amount:</span>
+                    <span className="text-lg font-black text-amber-900 font-mono">₹350.00</span>
+                  </div>
+                  <p className="text-[11px] text-amber-800">
+                    This registration fee will be recorded as <strong>Pending</strong>. You or an admin can mark it as Paid or Free at any time.
+                  </p>
+                </div>
+              )}
+
+              {/* Settlement Date (Only if Settled) */}
+              {quickSettleMode !== 'Pending' && (
+                <div className="space-y-1">
+                  <label className="text-xs font-mono font-bold text-gray-700 uppercase">Settlement Date</label>
+                  <input
+                    type="date"
+                    value={quickPaymentDate}
+                    onChange={(e) => setQuickPaymentDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold"
+                    required
+                  />
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-end pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => { setQuickEditingFee(null); setQuickFeeStudent(null); }}
+                  className="px-4 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className={`px-5 py-2.5 rounded-xl text-xs font-extrabold shadow-md cursor-pointer flex items-center gap-1.5 transition-all ${
+                    quickSettleMode === 'Free'
+                      ? 'bg-amber-500 text-slate-950 hover:bg-amber-600 border border-amber-400'
+                      : quickSettleMode === 'Paid'
+                        ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                        : 'bg-amber-700 hover:bg-amber-800 text-white'
+                  }`}
+                >
+                  <Check size={16} />
+                  <span>
+                    {quickSettleMode === 'Free' 
+                      ? 'Confirm Free Registration (₹0.00)' 
+                      : quickSettleMode === 'Paid' 
+                        ? 'Confirm Payment (₹350.00)' 
+                        : 'Set as Pending (₹350.00)'}
+                  </span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Registration Receipt Modal */}
+      {selectedReceiptFee && (
+        <ReceiptModal
+          fee={selectedReceiptFee}
+          student={receiptStudent || students.find(s => s.id === selectedReceiptFee.studentId) || null}
+          onClose={() => {
+            setSelectedReceiptFee(null);
+            setReceiptStudent(null);
+          }}
+        />
       )}
     </div>
   );
