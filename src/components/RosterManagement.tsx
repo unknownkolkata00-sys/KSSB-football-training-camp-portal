@@ -361,17 +361,21 @@ export default function RosterManagement({
     e.preventDefault();
     if (!selectedStudent) return;
 
+    // Check if attendance already recorded on this date
+    const existingMetric = metrics.find(m => m.studentId === selectedStudent.id && m.date === metricDate);
+    const finalAttendance = existingMetric ? existingMetric.attendance : metricAttendance;
+
     onAddMetric({
       studentId: selectedStudent.id,
       date: metricDate,
-      markedAt: Date.now(),
+      markedAt: existingMetric?.markedAt || Date.now(),
       speed: Number(metricSpeed),
       agility: Number(metricAgility),
       stamina: Number(metricStamina),
       passing: Number(metricPassing),
       shooting: Number(metricShooting),
       defense: Number(metricDefense),
-      attendance: metricAttendance,
+      attendance: finalAttendance,
       notes: metricNotes
     });
 
@@ -1087,6 +1091,48 @@ export default function RosterManagement({
                     required
                   />
                 </div>
+
+                {/* Attendance Lock / Status Indicator */}
+                {(() => {
+                  const existingMetric = metrics.find(m => m.studentId === selectedStudent.id && m.date === metricDate);
+                  if (existingMetric) {
+                    return (
+                      <div className="col-span-2 p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs font-mono text-emerald-950 font-bold">
+                          <Lock size={14} className="text-emerald-700" />
+                          <span>Attendance on {metricDate}: <strong className="text-emerald-900 uppercase underline">{existingMetric.attendance}</strong></span>
+                        </div>
+                        <span className="px-2 py-0.5 bg-emerald-200 text-emerald-900 text-[10px] font-mono font-bold rounded">
+                          🔒 Permanently Locked
+                        </span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="col-span-2 p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-mono font-bold text-amber-900">
+                        <span>Attendance Status for {metricDate}</span>
+                        <span className="text-[10px] font-normal text-amber-800">Will be permanently locked once saved</span>
+                      </div>
+                      <div className="flex gap-2">
+                        {(['Present', 'Absent', 'Excused'] as const).map(status => (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => setMetricAttendance(status)}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              metricAttendance === status
+                                ? status === 'Present' ? 'bg-emerald-600 text-white' : status === 'Absent' ? 'bg-rose-600 text-white' : 'bg-amber-600 text-white'
+                                : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                            }`}
+                          >
+                            {status}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-mono font-bold text-gray-700 uppercase">40yd Sprint (sec)</label>

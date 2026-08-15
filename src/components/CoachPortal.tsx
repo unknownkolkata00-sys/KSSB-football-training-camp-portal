@@ -3,6 +3,7 @@ import { Student, PerformanceMetric, FeeStatus, Tournament, GalleryImage } from 
 import { UserCheck, Activity, CreditCard, Lock, CheckCircle2, Clock, Check, Phone, Award, ArrowLeft, Trophy, Camera } from 'lucide-react';
 import TournamentScheduler from './TournamentScheduler';
 import GalleryView from './GalleryView';
+import DailyAttendanceRegister from './DailyAttendanceRegister';
 import kssbFcLogo from '../assets/images/kssb_fc_official_logo.jpg';
 import StudentAvatar from './StudentAvatar';
 
@@ -31,17 +32,8 @@ export default function CoachPortal({
 }: CoachPortalProps) {
   const [activeSubTab, setActiveSubTab] = useState<'attendance' | 'performance' | 'tournaments' | 'gallery' | 'pending_fees'>('attendance');
 
-  // Attendance Marking State
-  const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
-  const [sessionType, setSessionType] = useState('Tactical & Fitness Training');
-  const [attendanceRecords, setAttendanceRecords] = useState<Record<string, 'Present' | 'Absent' | 'Excused'>>(() => {
-    const initial: Record<string, 'Present' | 'Absent' | 'Excused'> = {};
-    students.forEach(s => { initial[s.id] = 'Present'; });
-    return initial;
-  });
-  const [sessionNotes, setSessionNotes] = useState('');
-
   // Performance Review State
+  const [reviewDate, setReviewDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedStudentForReview, setSelectedStudentForReview] = useState<Student | null>(students[0] || null);
   const [reviewSpeed, setReviewSpeed] = useState<number>(4.8);
   const [reviewAgility, setReviewAgility] = useState<number>(4.9);
@@ -55,64 +47,9 @@ export default function CoachPortal({
   // Feedback Alert State
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Check if attendance for student on sessionDate was marked > 30 minutes ago
-  const isAttendanceLocked = (studentId: string) => {
-    const existing = metrics.find(m => m.studentId === studentId && m.date === sessionDate);
-    if (!existing || !existing.markedAt) return false;
-    const diffMins = (Date.now() - existing.markedAt) / (1000 * 60);
-    return diffMins > 30;
-  };
-
-  // Toggle single player attendance status for batch entry
-  const handleAttendanceToggle = (studentId: string, status: 'Present' | 'Absent' | 'Excused') => {
-    if (isAttendanceLocked(studentId)) {
-      setAlert({ type: 'error', message: 'Attendance once marked cannot be changed after 30 minutes from the time it was recorded!' });
-      return;
-    }
-    setAttendanceRecords(prev => ({
-      ...prev,
-      [studentId]: status
-    }));
-  };
-
-  // Save Batch Session Attendance
-  const handleSaveBatchAttendance = (e: React.FormEvent) => {
-    e.preventDefault();
-    let savedCount = 0;
-    let lockedCount = 0;
-
-    students.forEach(s => {
-      if (isAttendanceLocked(s.id)) {
-        lockedCount++;
-        return;
-      }
-
-      onAddMetric({
-        studentId: s.id,
-        date: sessionDate,
-        markedAt: Date.now(),
-        speed: 5.0,
-        agility: 5.0,
-        stamina: 7,
-        passing: 7,
-        shooting: 7,
-        defense: 7,
-        attendance: attendanceRecords[s.id] || 'Present',
-        notes: `[${sessionType}] ${sessionNotes || 'Daily session logged by Head Coach Abedemi Faniyan'}`
-      });
-      savedCount++;
-    });
-
-    if (lockedCount > 0) {
-      setAlert({ 
-        type: 'error', 
-        message: `Saved attendance for ${savedCount} students. ${lockedCount} student records were locked (>30 mins since initial marking) and could not be edited.` 
-      });
-    } else {
-      setAlert({ type: 'success', message: `Successfully logged training attendance for ${students.length} athletes on ${sessionDate}!` });
-    }
-    setSessionNotes('');
-    setTimeout(() => setAlert(null), 6000);
+  // Check if attendance for student on reviewDate is already recorded
+  const getExistingAttendance = (studentId: string, date: string) => {
+    return metrics.find(m => m.studentId === studentId && m.date === date);
   };
 
   // Save Individual Detailed Performance Review
@@ -120,20 +57,25 @@ export default function CoachPortal({
     e.preventDefault();
     if (!selectedStudentForReview) return;
 
+    const existingRecord = getExistingAttendance(selectedStudentForReview.id, reviewDate);
+    // If attendance is already marked and locked, preserve the existing attendance status
+    const finalAttendance = existingRecord ? existingRecord.attendance : reviewAttendance;
+
     onAddMetric({
       studentId: selectedStudentForReview.id,
-      date: sessionDate,
+      date: reviewDate,
+      markedAt: existingRecord?.markedAt || Date.now(),
       speed: Number(reviewSpeed),
       agility: Number(reviewAgility),
       stamina: Number(reviewStamina),
       passing: Number(reviewPassing),
       shooting: Number(reviewShooting),
       defense: Number(reviewDefense),
-      attendance: reviewAttendance,
+      attendance: finalAttendance,
       notes: reviewNotes || `Performance review logged by Coach Abedemi Faniyan`
     });
 
-    setAlert({ type: 'success', message: `Performance review report saved for ${selectedStudentForReview.name}!` });
+    setAlert({ type: 'success', message: `Performance drill review saved for ${selectedStudentForReview.name} on ${reviewDate}!` });
     setReviewNotes('');
     setTimeout(() => setAlert(null), 5000);
   };
@@ -289,214 +231,12 @@ export default function CoachPortal({
 
       {/* 1. ATTENDANCE MARKING */}
       {activeSubTab === 'attendance' && (
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 space-y-6 shadow-sm">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-gray-100">
-            <div className="space-y-1">
-              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <UserCheck size={22} className="text-emerald-700" />
-                Session Attendance Marking
-              </h3>
-              <p className="text-xs text-gray-500">Quickly mark Present, Absent, or Excused for all squad athletes during training sessions.</p>
-            </div>
-
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              <div>
-                <label className="text-[10px] font-mono font-bold text-gray-500 uppercase block">Training Date</label>
-                <input 
-                  type="date"
-                  value={sessionDate}
-                  onChange={(e) => setSessionDate(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold"
-                />
-              </div>
-              <div className="grow md:grow-0">
-                <label className="text-[10px] font-mono font-bold text-gray-500 uppercase block">Session Type</label>
-                <select 
-                  value={sessionType}
-                  onChange={(e) => setSessionType(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold bg-white w-full"
-                >
-                  <option value="Tactical & Fitness Training">Tactical & Fitness Training</option>
-                  <option value="Match Day Practice">Match Day Practice</option>
-                  <option value="Physical Conditioning">Physical Conditioning</option>
-                  <option value="Recovery Session">Recovery Session</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Roster Attendance Entry */}
-          <form onSubmit={handleSaveBatchAttendance} className="space-y-6">
-            {/* Mobile Vertical View for Portrait Phones */}
-            <div className="block sm:hidden space-y-3">
-              {students.map(s => {
-                const locked = isAttendanceLocked(s.id);
-                const currentStatus = attendanceRecords[s.id] || 'Present';
-                return (
-                  <div key={s.id} className="p-4 bg-gray-50/80 border border-gray-200 rounded-2xl space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-2.5">
-                        <StudentAvatar photoUrl={s.photoUrl} name={s.name} size="md" />
-                        <div>
-                          <div className="font-bold text-gray-900 text-sm leading-tight">{s.name}</div>
-                          <div className="text-xs text-gray-500 font-mono">Reg: {s.registrationNumber || 'KSSBFC0001/26-27'}</div>
-                        </div>
-                      </div>
-                      <span className="px-2.5 py-1 rounded bg-white border border-gray-200 text-gray-800 font-mono text-[10px] font-bold">
-                        {s.position}
-                      </span>
-                    </div>
-
-                    <div className="text-xs text-gray-600 space-y-0.5">
-                      <div>Guardian: <strong>{s.fatherName || s.parentName}</strong></div>
-                      <div>Contact: <a href={`tel:${s.mobileNo || s.parentPhone}`} className="font-mono text-emerald-700 font-bold underline">{s.mobileNo || s.parentPhone}</a></div>
-                    </div>
-
-                    <div>
-                      {locked ? (
-                        <div className="flex items-center justify-center gap-1.5 p-2 bg-gray-100 text-gray-500 rounded-xl text-xs font-bold border border-gray-200">
-                          <Lock size={14} className="text-amber-600" />
-                          <span>Locked ({currentStatus}) — Marked &gt;30 mins ago</span>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-3 gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => handleAttendanceToggle(s.id, 'Present')}
-                            className={`py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
-                              currentStatus === 'Present' ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-600' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-100'
-                            }`}
-                          >
-                            ✓ Present
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleAttendanceToggle(s.id, 'Absent')}
-                            className={`py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
-                              currentStatus === 'Absent' ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-600' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-100'
-                            }`}
-                          >
-                            ✕ Absent
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleAttendanceToggle(s.id, 'Excused')}
-                            className={`py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
-                              currentStatus === 'Excused' ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-500' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-100'
-                            }`}
-                          >
-                            ~ Excused
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Desktop Table View */}
-            <div className="hidden sm:block border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-mono uppercase">
-                  <tr>
-                    <th className="p-3">Athlete Name</th>
-                    <th className="p-3">Position</th>
-                    <th className="p-3">Parent Contact</th>
-                    <th className="p-3 text-center">Attendance Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 font-medium">
-                  {students.map(s => {
-                    const locked = isAttendanceLocked(s.id);
-                    const currentStatus = attendanceRecords[s.id] || 'Present';
-                    return (
-                      <tr key={s.id} className="hover:bg-gray-50/60">
-                        <td className="p-3">
-                          <div className="flex items-center gap-3">
-                            <StudentAvatar photoUrl={s.photoUrl} name={s.name} size="md" />
-                            <div>
-                              <div className="font-bold text-gray-900 text-sm leading-tight">{s.name}</div>
-                              <div className="text-[11px] text-gray-500 font-mono">Reg: {s.registrationNumber || 'KSSBFC0001/26-27'}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          <span className="px-2.5 py-1 rounded bg-gray-100 text-gray-700 font-mono text-[10px] font-bold">
-                            {s.position}
-                          </span>
-                        </td>
-                        <td className="p-3 text-gray-600">
-                          <div>{s.fatherName || s.parentName}</div>
-                          <div className="text-[11px] text-gray-400 font-mono">{s.mobileNo || s.parentPhone}</div>
-                        </td>
-                        <td className="p-3">
-                          {locked ? (
-                            <div className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-500 rounded-lg text-xs font-bold border border-gray-200">
-                              <Lock size={14} className="text-amber-600" />
-                              <span>Locked ({currentStatus}) — Marked &gt;30 mins ago</span>
-                            </div>
-                          ) : (
-                            <div className="flex justify-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => handleAttendanceToggle(s.id, 'Present')}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                  currentStatus === 'Present' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
-                              >
-                                Present
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleAttendanceToggle(s.id, 'Absent')}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                  currentStatus === 'Absent' ? 'bg-rose-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
-                              >
-                                Absent
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleAttendanceToggle(s.id, 'Excused')}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                  currentStatus === 'Excused' ? 'bg-amber-500 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
-                              >
-                                Excused
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono font-bold text-gray-700 uppercase">Coach Session Notes</label>
-              <input 
-                type="text"
-                value={sessionNotes}
-                onChange={(e) => setSessionNotes(e.target.value)}
-                placeholder="e.g. Focus on high-pressing drills and quick transition passes."
-                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none"
-              />
-            </div>
-
-            <div className="flex justify-end">
-              <button 
-                type="submit"
-                className="w-full sm:w-auto px-6 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
-              >
-                <CheckCircle2 size={18} />
-                Save Session Attendance
-              </button>
-            </div>
-          </form>
-        </div>
+        <DailyAttendanceRegister 
+          students={students}
+          metrics={metrics}
+          onAddMetric={onAddMetric}
+          userRole="coach"
+        />
       )}
 
       {/* 2. PLAYER PERFORMANCE REVIEWS */}
@@ -532,12 +272,57 @@ export default function CoachPortal({
                 <label className="text-xs font-mono font-bold text-gray-700 uppercase">Evaluation Date</label>
                 <input 
                   type="date"
-                  value={sessionDate}
-                  onChange={(e) => setSessionDate(e.target.value)}
+                  value={reviewDate}
+                  onChange={(e) => setReviewDate(e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold"
                 />
               </div>
             </div>
+
+            {/* Attendance Status for this Date */}
+            {selectedStudentForReview && (() => {
+              const existingRecord = getExistingAttendance(selectedStudentForReview.id, reviewDate);
+              if (existingRecord) {
+                return (
+                  <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-mono text-emerald-950 font-bold">
+                      <Lock size={15} className="text-emerald-700" />
+                      <span>Attendance on {reviewDate}: <strong className="text-emerald-800 uppercase underline">{existingRecord.attendance}</strong></span>
+                    </div>
+                    <span className="px-2.5 py-1 bg-emerald-200/80 text-emerald-900 text-[10px] font-mono font-bold rounded-lg">
+                      🔒 Permanently Locked
+                    </span>
+                  </div>
+                );
+              }
+              return (
+                <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-mono font-bold text-amber-950 uppercase flex items-center gap-1.5">
+                      <Clock size={14} className="text-amber-700" />
+                      <span>Set Session Attendance for {reviewDate}</span>
+                    </label>
+                    <span className="text-[10px] font-mono text-amber-800">Will be permanently locked upon saving</span>
+                  </div>
+                  <div className="flex gap-2">
+                    {(['Present', 'Absent', 'Excused'] as const).map(status => (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => setReviewAttendance(status)}
+                        className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          reviewAttendance === status
+                            ? status === 'Present' ? 'bg-emerald-600 text-white' : status === 'Absent' ? 'bg-rose-600 text-white' : 'bg-amber-600 text-white'
+                            : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Drill Scores Sliders/Inputs */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">

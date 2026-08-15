@@ -999,6 +999,7 @@ export default function App() {
                     students={students}
                     metrics={metrics}
                     role="admin"
+                    onAddMetric={handleAddMetric}
                   />
                 )}
 
