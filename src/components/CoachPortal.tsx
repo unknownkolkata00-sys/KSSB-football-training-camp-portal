@@ -4,6 +4,7 @@ import { UserCheck, Activity, CreditCard, Lock, CheckCircle2, Clock, Check, Phon
 import TournamentScheduler from './TournamentScheduler';
 import GalleryView from './GalleryView';
 import DailyAttendanceRegister from './DailyAttendanceRegister';
+import SingleShotPlayerEvaluationRegister from './SingleShotPlayerEvaluationRegister';
 import kssbFcLogo from '../assets/images/kssb_fc_official_logo.jpg';
 import StudentAvatar from './StudentAvatar';
 
@@ -32,53 +33,8 @@ export default function CoachPortal({
 }: CoachPortalProps) {
   const [activeSubTab, setActiveSubTab] = useState<'attendance' | 'performance' | 'tournaments' | 'gallery' | 'pending_fees'>('attendance');
 
-  // Performance Review State
-  const [reviewDate, setReviewDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedStudentForReview, setSelectedStudentForReview] = useState<Student | null>(students[0] || null);
-  const [reviewSpeed, setReviewSpeed] = useState<number>(4.8);
-  const [reviewAgility, setReviewAgility] = useState<number>(4.9);
-  const [reviewStamina, setReviewStamina] = useState<number>(8);
-  const [reviewPassing, setReviewPassing] = useState<number>(8);
-  const [reviewShooting, setReviewShooting] = useState<number>(7);
-  const [reviewDefense, setReviewDefense] = useState<number>(8);
-  const [reviewAttendance, setReviewAttendance] = useState<'Present' | 'Absent' | 'Excused'>('Present');
-  const [reviewNotes, setReviewNotes] = useState('');
-
   // Feedback Alert State
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-
-  // Check if attendance for student on reviewDate is already recorded
-  const getExistingAttendance = (studentId: string, date: string) => {
-    return metrics.find(m => m.studentId === studentId && m.date === date);
-  };
-
-  // Save Individual Detailed Performance Review
-  const handleSavePerformanceReview = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedStudentForReview) return;
-
-    const existingRecord = getExistingAttendance(selectedStudentForReview.id, reviewDate);
-    // If attendance is already marked and locked, preserve the existing attendance status
-    const finalAttendance = existingRecord ? existingRecord.attendance : reviewAttendance;
-
-    onAddMetric({
-      studentId: selectedStudentForReview.id,
-      date: reviewDate,
-      markedAt: existingRecord?.markedAt || Date.now(),
-      speed: Number(reviewSpeed),
-      agility: Number(reviewAgility),
-      stamina: Number(reviewStamina),
-      passing: Number(reviewPassing),
-      shooting: Number(reviewShooting),
-      defense: Number(reviewDefense),
-      attendance: finalAttendance,
-      notes: reviewNotes || `Performance review logged by Coach Abedemi Faniyan`
-    });
-
-    setAlert({ type: 'success', message: `Performance drill review saved for ${selectedStudentForReview.name} on ${reviewDate}!` });
-    setReviewNotes('');
-    setTimeout(() => setAlert(null), 5000);
-  };
 
   // Filter pending or overdue fees starting from August 2026 onwards for active, non-deleted players
   const activeStudentIds = new Set(students.filter(s => s.status !== 'Inactive').map(s => s.id));
@@ -241,206 +197,12 @@ export default function CoachPortal({
 
       {/* 2. PLAYER PERFORMANCE REVIEWS */}
       {activeSubTab === 'performance' && (
-        <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-6 shadow-sm">
-          <div className="space-y-1 pb-4 border-b border-gray-100">
-            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Activity size={22} className="text-emerald-700" />
-              Player Performance Review Logger
-            </h3>
-            <p className="text-xs text-gray-500">Log physical benchmarks (40yd dash speed, agility shuttle) and technical skill ratings with coach feedback.</p>
-          </div>
-
-          <form onSubmit={handleSavePerformanceReview} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono font-bold text-gray-700 uppercase">Select Athlete to Review</label>
-                <select 
-                  value={selectedStudentForReview?.id || ''}
-                  onChange={(e) => {
-                    const st = students.find(s => s.id === e.target.value);
-                    if (st) setSelectedStudentForReview(st);
-                  }}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold bg-white"
-                >
-                  {students.map(s => (
-                    <option key={s.id} value={s.id}>{s.name} ({s.position} — Age {s.age})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono font-bold text-gray-700 uppercase">Evaluation Date</label>
-                <input 
-                  type="date"
-                  value={reviewDate}
-                  onChange={(e) => setReviewDate(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold"
-                />
-              </div>
-            </div>
-
-            {/* Attendance Status for this Date */}
-            {selectedStudentForReview && (() => {
-              const existingRecord = getExistingAttendance(selectedStudentForReview.id, reviewDate);
-              if (existingRecord) {
-                return (
-                  <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs font-mono text-emerald-950 font-bold">
-                      <Lock size={15} className="text-emerald-700" />
-                      <span>Attendance on {reviewDate}: <strong className="text-emerald-800 uppercase underline">{existingRecord.attendance}</strong></span>
-                    </div>
-                    <span className="px-2.5 py-1 bg-emerald-200/80 text-emerald-900 text-[10px] font-mono font-bold rounded-lg">
-                      🔒 Permanently Locked
-                    </span>
-                  </div>
-                );
-              }
-              return (
-                <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-mono font-bold text-amber-950 uppercase flex items-center gap-1.5">
-                      <Clock size={14} className="text-amber-700" />
-                      <span>Set Session Attendance for {reviewDate}</span>
-                    </label>
-                    <span className="text-[10px] font-mono text-amber-800">Will be permanently locked upon saving</span>
-                  </div>
-                  <div className="flex gap-2">
-                    {(['Present', 'Absent', 'Excused'] as const).map(status => (
-                      <button
-                        key={status}
-                        type="button"
-                        onClick={() => setReviewAttendance(status)}
-                        className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          reviewAttendance === status
-                            ? status === 'Present' ? 'bg-emerald-600 text-white' : status === 'Absent' ? 'bg-rose-600 text-white' : 'bg-amber-600 text-white'
-                            : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-100'
-                        }`}
-                      >
-                        {status}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Drill Scores Sliders/Inputs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-700 flex justify-between">
-                  <span>40yd Dash Speed (sec)</span>
-                  <span className="text-emerald-700 font-mono">{reviewSpeed}s</span>
-                </label>
-                <input 
-                  type="number" 
-                  step="0.1" 
-                  min="3.0" 
-                  max="10.0"
-                  value={reviewSpeed}
-                  onChange={(e) => setReviewSpeed(Number(e.target.value))}
-                  className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-mono font-bold"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-700 flex justify-between">
-                  <span>Cone Agility Run (sec)</span>
-                  <span className="text-emerald-700 font-mono">{reviewAgility}s</span>
-                </label>
-                <input 
-                  type="number" 
-                  step="0.1" 
-                  min="3.0" 
-                  max="10.0"
-                  value={reviewAgility}
-                  onChange={(e) => setReviewAgility(Number(e.target.value))}
-                  className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-mono font-bold"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-700 flex justify-between">
-                  <span>Stamina Rating (1-10)</span>
-                  <span className="text-emerald-700 font-mono">{reviewStamina}/10</span>
-                </label>
-                <input 
-                  type="number" 
-                  min="1" 
-                  max="10"
-                  value={reviewStamina}
-                  onChange={(e) => setReviewStamina(Number(e.target.value))}
-                  className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-mono font-bold"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-700 flex justify-between">
-                  <span>Passing Accuracy (1-10)</span>
-                  <span className="text-emerald-700 font-mono">{reviewPassing}/10</span>
-                </label>
-                <input 
-                  type="number" 
-                  min="1" 
-                  max="10"
-                  value={reviewPassing}
-                  onChange={(e) => setReviewPassing(Number(e.target.value))}
-                  className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-mono font-bold"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-700 flex justify-between">
-                  <span>Shooting Technique (1-10)</span>
-                  <span className="text-emerald-700 font-mono">{reviewShooting}/10</span>
-                </label>
-                <input 
-                  type="number" 
-                  min="1" 
-                  max="10"
-                  value={reviewShooting}
-                  onChange={(e) => setReviewShooting(Number(e.target.value))}
-                  className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-mono font-bold"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-700 flex justify-between">
-                  <span>Defensive Positioning (1-10)</span>
-                  <span className="text-emerald-700 font-mono">{reviewDefense}/10</span>
-                </label>
-                <input 
-                  type="number" 
-                  min="1" 
-                  max="10"
-                  value={reviewDefense}
-                  onChange={(e) => setReviewDefense(Number(e.target.value))}
-                  className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-mono font-bold"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono font-bold text-gray-700 uppercase">Coach Abedemi Faniyan's Feedback Notes</label>
-              <textarea 
-                rows={3}
-                value={reviewNotes}
-                onChange={(e) => setReviewNotes(e.target.value)}
-                placeholder="e.g. Excellent tactical awareness during 2-on-1 fast breaks. Needs to work on weaker foot passing under pressure."
-                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none"
-              />
-            </div>
-
-            <div className="flex justify-end">
-              <button 
-                type="submit"
-                className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm rounded-xl flex items-center gap-2 shadow-sm transition-all cursor-pointer"
-              >
-                <Award size={18} />
-                Save Performance Review
-              </button>
-            </div>
-          </form>
-        </div>
+        <SingleShotPlayerEvaluationRegister
+          students={students}
+          metrics={metrics}
+          onAddMetric={onAddMetric}
+          userRole="coach"
+        />
       )}
 
       {/* 3. TEAM SQUAD SELECTION */}

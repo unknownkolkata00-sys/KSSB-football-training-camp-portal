@@ -74,7 +74,7 @@ app.post('/api/generate-notification', async (req, res) => {
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json'
@@ -158,7 +158,7 @@ The head training coach has shown exceptional leadership during this training cy
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: prompt,
     });
 

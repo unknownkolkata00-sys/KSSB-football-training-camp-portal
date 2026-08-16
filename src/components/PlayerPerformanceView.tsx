@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Student, PerformanceMetric } from '../types';
-import { Sparkles, Activity, Clock, Award, ShieldAlert, AlignLeft, BarChart2, Download, UserCheck, Calendar } from 'lucide-react';
+import { Sparkles, Activity, Clock, Award, ShieldAlert, AlignLeft, BarChart2, Download, UserCheck, Calendar, SlidersHorizontal } from 'lucide-react';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { downloadAttendanceReportCSV } from '../utils/reports';
 import StudentAvatar from './StudentAvatar';
 import DailyAttendanceRegister from './DailyAttendanceRegister';
+import SingleShotPlayerEvaluationRegister from './SingleShotPlayerEvaluationRegister';
 
 interface PlayerPerformanceViewProps {
   students: Student[];
@@ -22,7 +23,7 @@ export default function PlayerPerformanceView({
   onAddMetric
 }: PlayerPerformanceViewProps) {
   const isStudent = role === 'student';
-  const [activeSubTab, setActiveSubTab] = useState<'attendance' | 'analytics'>(isStudent ? 'analytics' : 'attendance');
+  const [activeSubTab, setActiveSubTab] = useState<'evaluation' | 'attendance' | 'analytics'>(isStudent ? 'analytics' : 'evaluation');
 
   const initialStudentId = isStudent ? loggedInStudentId : (students[0]?.id || '');
   const [selectedStudentId, setSelectedStudentId] = useState<string>(initialStudentId);
@@ -93,6 +94,19 @@ export default function PlayerPerformanceView({
       {!isStudent && (
         <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm" id="performance-view-tabs">
           <button
+            onClick={() => setActiveSubTab('evaluation')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              activeSubTab === 'evaluation'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            id="tab-single-shot-evaluation"
+          >
+            <Award size={15} className={activeSubTab === 'evaluation' ? 'text-yellow-300' : 'text-slate-400'} />
+            <span>Single-Shot Player Evaluation Sheet (All Players Visible)</span>
+          </button>
+
+          <button
             onClick={() => setActiveSubTab('attendance')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeSubTab === 'attendance'
@@ -115,12 +129,22 @@ export default function PlayerPerformanceView({
             id="tab-player-analytics"
           >
             <Activity size={15} />
-            <span>Individual Athlete Benchmarks & Radar Profiles</span>
+            <span>Individual Athlete Radar & Benchmarks</span>
           </button>
         </div>
       )}
 
-      {/* SubTab 1: Master Daily Attendance Register */}
+      {/* SubTab 1: Single-Shot Multi-Player Evaluation Matrix */}
+      {!isStudent && activeSubTab === 'evaluation' && (
+        <SingleShotPlayerEvaluationRegister
+          students={students}
+          metrics={metrics}
+          onAddMetric={onAddMetric || (() => {})}
+          userRole={role === 'admin' ? 'admin' : 'coach'}
+        />
+      )}
+
+      {/* SubTab 2: Master Daily Attendance Register */}
       {!isStudent && activeSubTab === 'attendance' && (
         <DailyAttendanceRegister
           students={students}
@@ -130,7 +154,7 @@ export default function PlayerPerformanceView({
         />
       )}
 
-      {/* SubTab 2: Individual Athlete Benchmarks & Radar Profiles */}
+      {/* SubTab 3: Individual Athlete Benchmarks & Radar Profiles */}
       {(isStudent || activeSubTab === 'analytics') && (
         <div className="space-y-6" id="analytics-subtab-container">
           {/* Header Selector */}
